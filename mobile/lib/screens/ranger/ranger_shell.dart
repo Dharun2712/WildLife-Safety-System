@@ -83,24 +83,36 @@ class _RangerShellState extends ConsumerState<RangerShell> {
           }),
         ],
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (i) => setState(() => _currentIndex = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Home'),
-          NavigationDestination(icon: Icon(Icons.notification_important_outlined), selectedIcon: Icon(Icons.notification_important), label: 'Alerts'),
-          NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map), label: 'Map'),
-          NavigationDestination(icon: Icon(Icons.videocam_outlined), selectedIcon: Icon(Icons.videocam), label: 'Monitor'),
-          NavigationDestination(icon: Icon(Icons.person_outline), selectedIcon: Icon(Icons.person), label: 'Profile'),
-        ],
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.06),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: NavigationBar(
+          selectedIndex: _currentIndex,
+          onDestinationSelected: (i) => setState(() => _currentIndex = i),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Home'),
+            NavigationDestination(icon: Icon(Icons.notification_important_outlined), selectedIcon: Icon(Icons.notification_important_rounded), label: 'Alerts'),
+            NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map_rounded), label: 'Map'),
+            NavigationDestination(icon: Icon(Icons.videocam_outlined), selectedIcon: Icon(Icons.videocam_rounded), label: 'Monitor'),
+            NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Profile'),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ==========================================
-// 1. RANGER HOME TAB
-// ==========================================
+// ═══════════════════════════════════════════════════
+// 1. RANGER HOME TAB — Tactical Dashboard
+// ═══════════════════════════════════════════════════
 class _RangerHomeTab extends ConsumerWidget {
   final AuthState auth;
   const _RangerHomeTab({required this.auth});
@@ -113,20 +125,6 @@ class _RangerHomeTab extends ConsumerWidget {
     final detectionsAsync = ref.watch(detectionsProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Ranger Operations HQ'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () {
-              ref.invalidate(alertsProvider);
-              ref.invalidate(dangerZonesProvider);
-              ref.invalidate(camerasProvider);
-              ref.invalidate(detectionsProvider);
-            },
-          )
-        ],
-      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(alertsProvider);
@@ -134,150 +132,277 @@ class _RangerHomeTab extends ConsumerWidget {
           ref.invalidate(camerasProvider);
           ref.invalidate(detectionsProvider);
         },
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Officer ${auth.user?['full_name'] ?? 'Ranger'} 🛡️',
-                        style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700),
-                      ),
-                      const SizedBox(height: 4),
-                      Text('Mudumalai Wildlife Reserve Sector', style: TextStyle(color: Colors.grey.shade600)),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1565C0).withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF1565C0)),
-                  ),
-                  child: const Text('ON DUTY', style: TextStyle(color: Color(0xFF1565C0), fontWeight: FontWeight.bold, fontSize: 11)),
+        child: CustomScrollView(
+          slivers: [
+            // Ranger gradient app bar
+            SliverAppBar(
+              expandedHeight: 170,
+              pinned: true,
+              backgroundColor: AppTheme.rangerBlue,
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () {
+                    ref.invalidate(alertsProvider);
+                    ref.invalidate(dangerZonesProvider);
+                    ref.invalidate(camerasProvider);
+                    ref.invalidate(detectionsProvider);
+                  },
                 )
               ],
-            ),
-            const SizedBox(height: 20),
-
-            // Operational Metric Cards
-            Row(
-              children: [
-                Expanded(
-                  child: _MetricCard(
-                    title: 'Active Alerts',
-                    count: alertsAsync.value?.where((a) => a['status'] == 'active' || a['status'] == 'needs_verification' || a['status'] == 'monitoring').length.toString() ?? '...',
-                    icon: Icons.warning_amber_rounded,
-                    color: AppTheme.dangerRed,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _MetricCard(
-                    title: 'Danger Zones',
-                    count: zonesAsync.value?.length.toString() ?? '...',
-                    icon: Icons.radar,
-                    color: AppTheme.approachingAmber,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _MetricCard(
-                    title: 'Live Cameras',
-                    count: '${camerasAsync.value?.where((c) => c['status'] == 'online').length ?? 0}/${camerasAsync.value?.length ?? 0}',
-                    icon: Icons.videocam,
-                    color: const Color(0xFF1565C0),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _MetricCard(
-                    title: 'Total Detections',
-                    count: detectionsAsync.value?.length.toString() ?? '...',
-                    icon: Icons.pets,
-                    color: AppTheme.forestGreen,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // High Priority Pending Verification Alerts
-            const Text('Action Required (High Priority)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            alertsAsync.when(
-              data: (alerts) {
-                final pending = alerts.where((a) => a['status'] == 'needs_verification' || a['status'] == 'active').toList();
-                if (pending.isEmpty) {
-                  return Card(
+              flexibleSpace: FlexibleSpaceBar(
+                background: Container(
+                  decoration: const BoxDecoration(gradient: AppTheme.rangerGradient),
+                  child: SafeArea(
                     child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Row(
+                      padding: const EdgeInsets.fromLTRB(20, 48, 20, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          const Icon(Icons.check_circle_outline, color: AppTheme.safeGreen, size: 32),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text('All Sectors Normal', style: TextStyle(fontWeight: FontWeight.w600)),
-                                Text('No pending unverified alerts or unacknowledged incidents.', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                              ],
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'Officer ${auth.user?['full_name'] ?? 'Ranger'} 🛡️',
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      'Mudumalai Wildlife Reserve',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Colors.white.withValues(alpha: 0.6),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 8, height: 8,
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.safeGreen,
+                                        shape: BoxShape.circle,
+                                        boxShadow: [BoxShadow(color: AppTheme.safeGreen.withValues(alpha: 0.4), blurRadius: 4)],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    const Text('ON DUTY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.5)),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                     ),
-                  );
-                }
-                return Column(
-                  children: pending.take(3).map((a) => _RangerAlertActionCard(alert: a, ref: ref)).toList(),
-                );
-              },
-              loading: () => const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())),
-              error: (err, _) => Card(child: Padding(padding: const EdgeInsets.all(16), child: Text('Error: $err'))),
+                  ),
+                ),
+              ),
+              title: const Text('Ranger HQ'),
             ),
-            const SizedBox(height: 20),
 
-            // Recent Wildlife Detections Feed
-            const Text('Recent Live AI Detections', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            detectionsAsync.when(
-              data: (dets) {
-                if (dets.isEmpty) {
-                  return const Card(child: Padding(padding: EdgeInsets.all(16), child: Text('No detections recorded yet.')));
-                }
-                return Column(
-                  children: dets.take(4).map((d) {
-                    final animal = d['animal_type'] ?? 'unknown';
-                    final isSim = d['is_simulation'] == true;
-                    final conf = (((d['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: Text(AppConstants.animalEmojis[animal] ?? '🐾', style: const TextStyle(fontSize: 26)),
-                        title: Text('${AppConstants.animalNames[animal] ?? animal} ${isSim ? "(Simulated)" : ""}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        subtitle: Text('Camera: ${d['camera_id']} • Conf: $conf% • ${d['status']}'),
-                        trailing: Text(
-                          d['timestamp'] != null ? d['timestamp'].toString().split('T').last.split('.').first : '',
-                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildListDelegate([
+                  // Metric Cards Grid
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _GlassMetricCard(
+                          title: 'Active Alerts',
+                          count: alertsAsync.value?.where((a) => a['status'] == 'active' || a['status'] == 'needs_verification' || a['status'] == 'monitoring').length.toString() ?? '...',
+                          icon: Icons.warning_amber_rounded,
+                          color: AppTheme.dangerRed,
                         ),
                       ),
-                    );
-                  }).toList(),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const SizedBox(),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _GlassMetricCard(
+                          title: 'Danger Zones',
+                          count: zonesAsync.value?.length.toString() ?? '...',
+                          icon: Icons.radar_rounded,
+                          color: AppTheme.approachingAmber,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _GlassMetricCard(
+                          title: 'Live Cameras',
+                          count: '${camerasAsync.value?.where((c) => c['status'] == 'online').length ?? 0}/${camerasAsync.value?.length ?? 0}',
+                          icon: Icons.videocam_rounded,
+                          color: AppTheme.rangerBlue,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _GlassMetricCard(
+                          title: 'Detections',
+                          count: detectionsAsync.value?.length.toString() ?? '...',
+                          icon: Icons.pets_rounded,
+                          color: AppTheme.forestGreen,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Action Required
+                  Row(
+                    children: [
+                      Icon(Icons.priority_high_rounded, size: 20, color: AppTheme.dangerRed),
+                      const SizedBox(width: 8),
+                      const Text('Action Required', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  alertsAsync.when(
+                    data: (alerts) {
+                      final pending = alerts.where((a) => a['status'] == 'needs_verification' || a['status'] == 'active').toList();
+                      if (pending.isEmpty) {
+                        return _PremiumEmptyState(
+                          icon: Icons.check_circle_outline_rounded,
+                          color: AppTheme.safeGreen,
+                          title: 'All Sectors Normal',
+                          subtitle: 'No pending alerts require your attention',
+                        );
+                      }
+                      return Column(
+                        children: pending.take(3).map((a) => _RangerAlertActionCard(alert: a, ref: ref)).toList(),
+                      );
+                    },
+                    loading: () => const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())),
+                    error: (err, _) => Text('Error: $err'),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // Recent Detections
+                  Row(
+                    children: [
+                      Icon(Icons.timeline_rounded, size: 20, color: AppTheme.forestGreen),
+                      const SizedBox(width: 8),
+                      const Text('Recent AI Detections', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  detectionsAsync.when(
+                    data: (dets) {
+                      if (dets.isEmpty) {
+                        return _PremiumEmptyState(
+                          icon: Icons.pets_rounded,
+                          color: Colors.grey,
+                          title: 'No detections yet',
+                          subtitle: 'AI camera detections will appear here',
+                        );
+                      }
+                      return Column(
+                        children: dets.take(4).map((d) {
+                          final animal = d['animal_type'] ?? 'unknown';
+                          final isSim = d['is_simulation'] == true;
+                          final conf = (((d['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
+                          final animalColor = AppTheme.animalColors[animal] ?? Colors.grey;
+
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: AppTheme.elevatedShadow,
+                            ),
+                            child: IntrinsicHeight(
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 4,
+                                    decoration: BoxDecoration(
+                                      color: animalColor,
+                                      borderRadius: const BorderRadius.only(
+                                        topLeft: Radius.circular(16),
+                                        bottomLeft: Radius.circular(16),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 44,
+                                            height: 44,
+                                            decoration: BoxDecoration(
+                                              color: animalColor.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(12),
+                                            ),
+                                            child: Center(
+                                              child: Text(
+                                                AppConstants.animalEmojis[animal] ?? '🐾',
+                                                style: const TextStyle(fontSize: 24),
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  '${AppConstants.animalNames[animal] ?? animal} ${isSim ? "(Sim)" : ""}',
+                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                                                ),
+                                                const SizedBox(height: 2),
+                                                Text(
+                                                  'Camera: ${d['camera_id']} • Conf: $conf%',
+                                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          Text(
+                                            d['timestamp'] != null
+                                                ? d['timestamp'].toString().split('T').last.split('.').first
+                                                : '',
+                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (_, __) => const SizedBox(),
+                  ),
+                  const SizedBox(height: 16),
+                ]),
+              ),
             ),
           ],
         ),
@@ -286,46 +411,109 @@ class _RangerHomeTab extends ConsumerWidget {
   }
 }
 
-class _MetricCard extends StatelessWidget {
+// Premium glassmorphism metric card
+class _GlassMetricCard extends StatelessWidget {
   final String title;
   final String count;
   final IconData icon;
   final Color color;
 
-  const _MetricCard({required this.title, required this.count, required this.icon, required this.color});
+  const _GlassMetricCard({required this.title, required this.count, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(count, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                ],
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: color.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+          ...AppTheme.elevatedShadow,
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)],
               ),
-            )
-          ],
-        ),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(count, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// ==========================================
+// Premium empty state
+class _PremiumEmptyState extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+
+  const _PremiumEmptyState({required this.icon, required this.color, required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppTheme.elevatedShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: color, size: 28),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════
 // 2. RANGER ALERTS TAB & ACTIONS
-// ==========================================
+// ═══════════════════════════════════════════════════
 class _RangerAlertsTab extends ConsumerWidget {
   const _RangerAlertsTab();
 
@@ -335,10 +523,10 @@ class _RangerAlertsTab extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Incident & Alert Management'),
+        title: const Text('Incident Management'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded),
             onPressed: () => ref.invalidate(alertsProvider),
           )
         ],
@@ -346,12 +534,19 @@ class _RangerAlertsTab extends ConsumerWidget {
       body: alertsAsync.when(
         data: (alerts) {
           if (alerts.isEmpty) {
-            return const Center(child: Text('No alerts in database.'));
+            return Center(
+              child: _PremiumEmptyState(
+                icon: Icons.inbox_rounded,
+                color: Colors.grey,
+                title: 'No incidents',
+                subtitle: 'Incidents will appear here',
+              ),
+            );
           }
           return RefreshIndicator(
             onRefresh: () async => ref.invalidate(alertsProvider),
             child: ListView.builder(
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.all(16),
               itemCount: alerts.length,
               itemBuilder: (ctx, i) => _RangerAlertActionCard(alert: alerts[i], ref: ref),
             ),
@@ -381,25 +576,45 @@ class _RangerAlertActionCard extends StatelessWidget {
     final isClosed = status == 'closed' || status == 'rejected';
     final alertId = alert['id'] ?? '';
     final conf = (((alert['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
+    final statusColor = AppTheme.getStatusColor(status);
+    final animalColor = AppTheme.animalColors[animal] ?? Colors.grey;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: isNeedsVerify ? AppTheme.approachingAmber : isActive ? AppTheme.dangerRed : Colors.grey.shade300,
-          width: isNeedsVerify || isActive ? 1.5 : 1,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: (isNeedsVerify || isActive) ? statusColor.withValues(alpha: 0.3) : Colors.grey.shade200,
+          width: (isNeedsVerify || isActive) ? 1.5 : 1,
         ),
+        boxShadow: [
+          if (isNeedsVerify || isActive)
+            BoxShadow(
+              color: statusColor.withValues(alpha: 0.08),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ...AppTheme.elevatedShadow,
+        ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Text(emoji, style: const TextStyle(fontSize: 28)),
-                const SizedBox(width: 10),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: animalColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Center(child: Text(emoji, style: const TextStyle(fontSize: 26))),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -408,75 +623,86 @@ class _RangerAlertActionCard extends StatelessWidget {
                         '${AppConstants.animalNames[animal] ?? animal} Incident',
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
                       ),
-                      Text('Zone ${alert['zone_code'] ?? 'A'} • Confidence: $conf% • ID: ${alertId.toString().substring(0, alertId.toString().length > 8 ? 8 : alertId.toString().length)}'),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Zone ${alert['zone_code'] ?? 'A'} • Conf: $conf% • ${alertId.toString().substring(0, alertId.toString().length > 8 ? 8 : alertId.toString().length)}',
+                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      ),
                     ],
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: AppTheme.getStatusColor(status).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
+                    gradient: AppTheme.getStatusGradient(status),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     status.toUpperCase(),
-                    style: TextStyle(color: AppTheme.getStatusColor(status), fontWeight: FontWeight.bold, fontSize: 10),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10, letterSpacing: 0.5),
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 10),
             Text(
-              'Coordinates: Lat ${(alert['latitude'] as num?)?.toStringAsFixed(4)}, Lng ${(alert['longitude'] as num?)?.toStringAsFixed(4)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+              'Lat ${(alert['latitude'] as num?)?.toStringAsFixed(4)}, Lng ${(alert['longitude'] as num?)?.toStringAsFixed(4)}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
             ),
             const Divider(height: 20),
 
-            // Action Buttons based on Alert State Machine
+            // Action buttons
             if (!isClosed)
               Wrap(
                 spacing: 8,
-                runSpacing: 6,
+                runSpacing: 8,
                 children: [
                   if (isNeedsVerify) ...[
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.safeGreen, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                      icon: const Icon(Icons.check, size: 16),
-                      label: const Text('Verify & Activate', style: TextStyle(fontSize: 12)),
-                      onPressed: () => _executeAction(context, '/api/alerts/$alertId/verify', 'Verified & Activated Danger Zone'),
+                    _actionButton(
+                      context,
+                      icon: Icons.check_rounded,
+                      label: 'Verify & Activate',
+                      gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF22C55E)]),
+                      onTap: () => _executeAction(context, '/api/alerts/$alertId/verify', 'Verified & Activated'),
                     ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(foregroundColor: AppTheme.dangerRed, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                      icon: const Icon(Icons.close, size: 16),
-                      label: const Text('Reject AI Detection', style: TextStyle(fontSize: 12)),
-                      onPressed: () => _executeAction(context, '/api/alerts/$alertId/reject', 'Detection Rejected'),
+                    _actionButton(
+                      context,
+                      icon: Icons.close_rounded,
+                      label: 'Reject',
+                      isOutlined: true,
+                      outlineColor: AppTheme.dangerRed,
+                      onTap: () => _executeAction(context, '/api/alerts/$alertId/reject', 'Detection Rejected'),
                     ),
                   ],
                   if (isActive)
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                      icon: const Icon(Icons.done_all, size: 16),
-                      label: const Text('Acknowledge', style: TextStyle(fontSize: 12)),
-                      onPressed: () => _executeAction(context, '/api/alerts/$alertId/acknowledge', 'Alert Acknowledged'),
+                    _actionButton(
+                      context,
+                      icon: Icons.done_all_rounded,
+                      label: 'Acknowledge',
+                      gradient: AppTheme.rangerGradient,
+                      onTap: () => _executeAction(context, '/api/alerts/$alertId/acknowledge', 'Alert Acknowledged'),
                     ),
                   if (isActive || isAck) ...[
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                      icon: const Icon(Icons.edit_location_alt, size: 16),
-                      label: const Text('Update Animal Location', style: TextStyle(fontSize: 12)),
-                      onPressed: () => _showUpdateLocationDialog(context, alertId, (alert['latitude'] as num?)?.toDouble() ?? 11.569, (alert['longitude'] as num?)?.toDouble() ?? 76.632),
+                    _actionButton(
+                      context,
+                      icon: Icons.edit_location_alt_rounded,
+                      label: 'Move Zone',
+                      isOutlined: true,
+                      onTap: () => _showUpdateLocationDialog(context, alertId, (alert['latitude'] as num?)?.toDouble() ?? 11.569, (alert['longitude'] as num?)?.toDouble() ?? 76.632),
                     ),
-                    OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.blueGrey, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                      icon: const Icon(Icons.people_outline, size: 16),
-                      label: const Text('Tourists in Zone', style: TextStyle(fontSize: 12)),
-                      onPressed: () => _showTouristsInZoneDialog(context, alertId),
+                    _actionButton(
+                      context,
+                      icon: Icons.people_outline_rounded,
+                      label: 'Tourists',
+                      isOutlined: true,
+                      onTap: () => _showTouristsInZoneDialog(context, alertId),
                     ),
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(backgroundColor: AppTheme.dangerRed, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8)),
-                      icon: const Icon(Icons.lock_outline, size: 16),
-                      label: const Text('Close Alert', style: TextStyle(fontSize: 12)),
-                      onPressed: () => _executeAction(context, '/api/alerts/$alertId/close', 'Alert & Danger Zone Closed'),
+                    _actionButton(
+                      context,
+                      icon: Icons.lock_outline_rounded,
+                      label: 'Close Alert',
+                      gradient: AppTheme.dangerGradient,
+                      onTap: () => _executeAction(context, '/api/alerts/$alertId/close', 'Alert Closed'),
                     ),
                   ],
                 ],
@@ -484,9 +710,57 @@ class _RangerAlertActionCard extends StatelessWidget {
             else
               Text(
                 'Incident Resolved / Closed by Ranger.',
-                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey.shade600),
+                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey.shade500),
               ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _actionButton(BuildContext context, {
+    required IconData icon,
+    required String label,
+    LinearGradient? gradient,
+    bool isOutlined = false,
+    Color? outlineColor,
+    required VoidCallback onTap,
+  }) {
+    if (isOutlined) {
+      return OutlinedButton.icon(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: outlineColor ?? AppTheme.textPrimary,
+          side: BorderSide(color: (outlineColor ?? Colors.grey).withValues(alpha: 0.3)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+        icon: Icon(icon, size: 16),
+        label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        onPressed: onTap,
+      );
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 16, color: Colors.white),
+                const SizedBox(width: 6),
+                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -560,7 +834,7 @@ class _RangerAlertActionCard extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Authorized Incident Tourist View'),
+        title: const Text('Tourists in Zone'),
         content: FutureBuilder(
           future: ApiService().dio.get('/api/tourists/locations/nearby', queryParameters: {'alert_id': alertId}),
           builder: (ctx, snapshot) {
@@ -568,12 +842,12 @@ class _RangerAlertActionCard extends StatelessWidget {
               return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
             }
             if (snapshot.hasError) {
-              return Text('Error fetching tourist data: ${snapshot.error}');
+              return Text('Error: ${snapshot.error}');
             }
             final data = snapshot.data?.data as Map<String, dynamic>?;
             final tourists = data?['tourists'] as List<dynamic>? ?? [];
             if (tourists.isEmpty) {
-              return const Text('No tourists currently detected inside or approaching this danger radius.');
+              return const Text('No tourists currently detected in this danger zone.');
             }
             return SizedBox(
               width: double.maxFinite,
@@ -601,9 +875,9 @@ class _RangerAlertActionCard extends StatelessWidget {
   }
 }
 
-// ==========================================
+// ═══════════════════════════════════════════════════
 // 3. RANGER MAP TAB
-// ==========================================
+// ═══════════════════════════════════════════════════
 class _RangerMapTab extends ConsumerWidget {
   const _RangerMapTab();
 
@@ -614,7 +888,7 @@ class _RangerMapTab extends ConsumerWidget {
     final touristsAsync = ref.watch(touristsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Ranger Tactical Sector OpenStreetMap')),
+      appBar: AppBar(title: const Text('Tactical Map')),
       body: zonesAsync.when(
         data: (zones) {
           final alerts = alertsAsync.value ?? [];
@@ -627,31 +901,40 @@ class _RangerMapTab extends ConsumerWidget {
                 touristLocations: tourists,
                 isRanger: true,
               ),
+              // Frosted glass legend
               Positioned(
                 bottom: 16,
                 left: 16,
                 right: 16,
-                child: Card(
-                  color: Colors.grey.shade900.withOpacity(0.9),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Tactical Legend', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.white)),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            _legendItem('🐯 Tiger (2000m)', const Color(0xFFFF6F00)),
-                            _legendItem('🐘 Elephant (2500m)', const Color(0xFF00D2FF)),
-                            _legendItem('🦁 Lion (2000m)', const Color(0xFFEF4444)),
-                          ],
-                        ),
-                      ],
-                    ),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade900.withValues(alpha: 0.92),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('Tactical Legend', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.white, letterSpacing: 0.5)),
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _legendItem('🐯 Tiger', const Color(0xFFFF6F00)),
+                          _legendItem('🐘 Elephant', const Color(0xFF00D2FF)),
+                          _legendItem('🦁 Lion', const Color(0xFFEF4444)),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -667,17 +950,25 @@ class _RangerMapTab extends ConsumerWidget {
   Widget _legendItem(String title, Color color) {
     return Row(
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(title, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600)),
+        Container(
+          width: 10,
+          height: 10,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4)],
+          ),
+        ),
+        const SizedBox(width: 6),
+        Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
       ],
     );
   }
 }
 
-// ==========================================
-// 4. RANGER MONITOR & REPORTING TAB
-// ==========================================
+// ═══════════════════════════════════════════════════
+// 4. RANGER MONITOR TAB
+// ═══════════════════════════════════════════════════
 class _RangerMonitorTab extends ConsumerWidget {
   const _RangerMonitorTab();
 
@@ -688,60 +979,115 @@ class _RangerMonitorTab extends ConsumerWidget {
     final incReportAsync = ref.watch(reportsProvider('incidents'));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Live Camera & Incident Analytics')),
+      appBar: AppBar(title: const Text('Monitor & Analytics')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          const Text('Camera Network Status', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.videocam_rounded, size: 20, color: AppTheme.rangerBlue),
+              const SizedBox(width: 8),
+              const Text('Camera Network', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
           camerasAsync.when(
             data: (cameras) => Column(
-              children: cameras.map((c) => Card(
-                child: ListTile(
-                  leading: const Icon(Icons.videocam, color: AppTheme.safeGreen),
-                  title: Text('${c['camera_id']} - ${c['name']}'),
-                  subtitle: Text('Type: ${c['type']} • Status: ${c['status'].toString().toUpperCase()}'),
-                  trailing: const Icon(Icons.circle, color: AppTheme.safeGreen, size: 12),
-                ),
-              )).toList(),
+              children: cameras.map((c) {
+                final isOnline = c['status'] == 'online';
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppTheme.elevatedShadow,
+                  ),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: (isOnline ? AppTheme.safeGreen : Colors.grey).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.videocam_rounded, color: isOnline ? AppTheme.safeGreen : Colors.grey, size: 22),
+                    ),
+                    title: Text('${c['camera_id']} - ${c['name']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                    subtitle: Text('Type: ${c['type']} • ${c['status'].toString().toUpperCase()}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+                    trailing: Container(
+                      width: 12, height: 12,
+                      decoration: BoxDecoration(
+                        color: isOnline ? AppTheme.safeGreen : Colors.grey,
+                        shape: BoxShape.circle,
+                        boxShadow: isOnline ? [BoxShadow(color: AppTheme.safeGreen.withValues(alpha: 0.4), blurRadius: 6)] : null,
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => const Text('Unable to load camera data.'),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          const Text('Incident Intelligence Summary (7 Days)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.analytics_rounded, size: 20, color: AppTheme.forestGreen),
+              const SizedBox(width: 8),
+              const Text('Incident Summary (7d)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
           incReportAsync.when(
-            data: (inc) => Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    _reportRow('Total Alerts Recorded', '${inc['total_alerts'] ?? 0}'),
-                    _reportRow('Currently Active Danger Zones', '${inc['active_danger_zones'] ?? 0}'),
-                    _reportRow('Successfully Closed Alerts', '${inc['closed'] ?? 0}'),
-                    _reportRow('Rejected Low-Conf Alerts', '${inc['rejected'] ?? 0}'),
-                  ],
-                ),
+            data: (inc) => Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppTheme.elevatedShadow,
+              ),
+              child: Column(
+                children: [
+                  _reportRow('Total Alerts', '${inc['total_alerts'] ?? 0}'),
+                  _reportRow('Active Danger Zones', '${inc['active_danger_zones'] ?? 0}'),
+                  _reportRow('Closed Alerts', '${inc['closed'] ?? 0}'),
+                  _reportRow('Rejected Alerts', '${inc['rejected'] ?? 0}'),
+                ],
               ),
             ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (_, __) => const SizedBox(),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
 
-          const Text('Wildlife Sighting Breakdown', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.pets_rounded, size: 20, color: AppTheme.approachingAmber),
+              const SizedBox(width: 8),
+              const Text('Wildlife Breakdown', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+            ],
+          ),
+          const SizedBox(height: 10),
           detReportAsync.when(
             data: (det) {
               final list = det['by_animal'] as List<dynamic>? ?? [];
-              return Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: list.map((a) => _reportRow('${AppConstants.animalNames[a['animal_type']] ?? a['animal_type']}', '${a['count']} detections (Avg Conf: ${(((a['avg_confidence'] ?? 0) as num) * 100).toStringAsFixed(0)}%)')).toList(),
-                  ),
+              return Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: AppTheme.elevatedShadow,
+                ),
+                child: Column(
+                  children: list.map((a) {
+                    final animalName = AppConstants.animalNames[a['animal_type']] ?? a['animal_type'];
+                    final avgConf = (((a['avg_confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
+                    return _reportRow(
+                      '${AppConstants.animalEmojis[a['animal_type']] ?? '🐾'} $animalName',
+                      '${a['count']} detections (Avg: $avgConf%)',
+                    );
+                  }).toList(),
                 ),
               );
             },
@@ -755,21 +1101,21 @@ class _RangerMonitorTab extends ConsumerWidget {
 
   Widget _reportRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 13)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
         ],
       ),
     );
   }
 }
 
-// ==========================================
+// ═══════════════════════════════════════════════════
 // 5. RANGER PROFILE TAB
-// ==========================================
+// ═══════════════════════════════════════════════════
 class _RangerProfileTab extends StatelessWidget {
   final AuthState auth;
   final VoidCallback onLogout;
@@ -779,50 +1125,133 @@ class _RangerProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Ranger Profile')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: const Color(0xFF1565C0).withValues(alpha: 0.15),
+          // Gradient profile header
+          Container(
+            width: double.infinity,
+            padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 16,
+              bottom: 28,
+              left: 24,
+              right: 24,
+            ),
+            decoration: const BoxDecoration(
+              gradient: AppTheme.rangerGradient,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(32),
+                bottomRight: Radius.circular(32),
+              ),
+            ),
+            child: Column(
+              children: [
+                const Text('Ranger Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+                const SizedBox(height: 20),
+                Container(
+                  width: 72,
+                  height: 72,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    color: Colors.white.withValues(alpha: 0.15),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 2),
+                  ),
+                  child: Center(
                     child: Text(
                       (auth.user?['full_name'] ?? 'R').substring(0, 1).toUpperCase(),
-                      style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, color: Color(0xFF1565C0)),
+                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
                     ),
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(auth.user?['full_name'] ?? 'Ranger Officer', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
-                        Text('Badge: ${auth.user?['badge_number'] ?? "MWR-001"} • Role: RANGER', style: TextStyle(color: Colors.grey.shade700, fontSize: 12)),
-                        const SizedBox(height: 4),
-                        Text(auth.user?['email'] ?? '', style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
-                      ],
-                    ),
-                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  auth.user?['full_name'] ?? 'Ranger Officer',
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Badge: ${auth.user?['badge_number'] ?? "MWR-001"} • RANGER',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.6)),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  auth.user?['email'] ?? '',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppTheme.elevatedShadow,
+              ),
+              child: Column(
+                children: [
+                  _menuItem(Icons.security_rounded, 'Security Protocols', () {}),
+                  Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+                  _menuItem(Icons.tune_rounded, 'Detection Threshold', () {}),
+                  Divider(height: 1, indent: 56, color: Colors.grey.shade100),
+                  _menuItem(Icons.info_outline_rounded, 'ForestGuard v1.0.0', () {}),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          ListTile(leading: const Icon(Icons.security), title: const Text('Sector Security Protocols'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-          ListTile(leading: const Icon(Icons.tune), title: const Text('Detection Threshold Config'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-          ListTile(leading: const Icon(Icons.info_outline), title: const Text('ForestGuard Version 1.0.0'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout, color: AppTheme.dangerRed),
-            title: const Text('Sign Out', style: TextStyle(color: AppTheme.dangerRed, fontWeight: FontWeight.bold)),
-            onTap: onLogout,
+
+          const SizedBox(height: 16),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppTheme.elevatedShadow,
+              ),
+              child: _menuItem(Icons.logout_rounded, 'Sign Out', onLogout, isDestructive: true),
+            ),
           ),
+
+          const SizedBox(height: 32),
         ],
+      ),
+    );
+  }
+
+  Widget _menuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
+    final color = isDestructive ? AppTheme.dangerRed : AppTheme.textPrimary;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: (isDestructive ? AppTheme.dangerRed : AppTheme.rangerBlue).withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color)),
+              ),
+              if (!isDestructive)
+                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -27,10 +27,18 @@ class DetectionAlertModal extends StatelessWidget {
     VoidCallback? onAcknowledge,
     bool isRanger = false,
   }) {
-    return showDialog<void>(
+    return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext ctx) {
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 350),
+      transitionBuilder: (ctx, anim, secondaryAnim, child) {
+        return ScaleTransition(
+          scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
+          child: FadeTransition(opacity: anim, child: child),
+        );
+      },
+      pageBuilder: (ctx, anim, secondaryAnim) {
         return DetectionAlertModal(
           detection: detection,
           onViewOnMap: onViewOnMap,
@@ -67,9 +75,9 @@ class DetectionAlertModal extends StatelessWidget {
     final snapshotUrl = '${AppConstants.apiBaseUrl.replaceAll('8000', '8501')}/api/camera/snapshot';
 
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      elevation: 16,
-      backgroundColor: Colors.grey.shade900,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      elevation: 20,
+      backgroundColor: const Color(0xFF1A1A1A),
       child: Container(
         padding: const EdgeInsets.all(20),
         constraints: const BoxConstraints(maxWidth: 420),
