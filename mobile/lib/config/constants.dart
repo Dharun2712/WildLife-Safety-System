@@ -1,9 +1,11 @@
 /// ForestGuard - App Constants
 /// API URLs and configuration loaded from build config.
 class AppConstants {
-  // Backend API - Configured for physical device on LAN and emulator
-  static const String apiBaseUrl = 'http://10.12.68.206:8000';
-  static const String wsBaseUrl = 'ws://10.12.68.206:8000/ws';
+  // Backend API - Deployed on Render Cloud
+  static const String apiBaseUrl =
+      'https://wildlife-safety-system.onrender.com';
+  static const String wsBaseUrl =
+      'wss://wildlife-safety-system.onrender.com/ws';
 
   // For Android Emulator localhost fallback:
   // static const String apiBaseUrl = 'http://10.0.2.2:8000';

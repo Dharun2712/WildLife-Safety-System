@@ -149,7 +149,6 @@ class _ForestMapViewState extends State<ForestMapView> {
       case MapProviderType.satellite:
         return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       case MapProviderType.openStreetMap:
-      default:
         return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     }
   }
@@ -262,7 +261,7 @@ class _ForestMapViewState extends State<ForestMapView> {
             decoration: BoxDecoration(
               color: Colors.grey.shade900.withOpacity(0.9),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade700!),
+              border: Border.all(color: Colors.grey.shade700),
               boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
             ),
             child: Row(
@@ -405,7 +404,6 @@ class _ForestMapViewState extends State<ForestMapView> {
       final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
       final lat = (alert['latitude'] is num) ? (alert['latitude'] as num).toDouble() : 11.5690;
       final lng = (alert['longitude'] is num) ? (alert['longitude'] as num).toDouble() : 76.6320;
-      final conf = (alert['confidence'] is num) ? (alert['confidence'] as num).toDouble() : 0.85;
 
       markers.add(
         Marker(
@@ -485,7 +483,7 @@ class _ForestMapViewState extends State<ForestMapView> {
       decoration: BoxDecoration(
         color: Colors.grey.shade900.withOpacity(0.9),
         shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade700!),
+        border: Border.all(color: Colors.grey.shade700),
         boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)],
       ),
       child: IconButton(
