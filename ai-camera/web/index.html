@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForestGuard Sentinel — AI Wildlife Surveillance & Threat Command Center</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Top Command Header -->
+        <header class="top-nav">
+            <div class="nav-brand">
+                <div class="brand-radar">
+                    <span class="radar-dot"></span>
+                    <span class="radar-wave"></span>
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title">
+                        <span>FORESTGUARD</span>
+                        <span class="brand-badge">SENTINEL AI</span>
+                    </div>
+                    <div class="brand-sub">Edge Wildlife Threat Surveillance & Autonomous Dispatch</div>
+                </div>
+            </div>
+
+            <!-- Threat Matrix Level Pill -->
+            <div class="threat-matrix-indicator" id="threat-matrix-indicator">
+                <span class="matrix-dot secure"></span>
+                <div class="matrix-info">
+                    <span class="matrix-label">SURVEILLANCE STATUS</span>
+                    <span class="matrix-val" id="threat-matrix-text">PERIMETER SECURE</span>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions & Telemetry -->
+            <div class="nav-controls">
+                <div class="telemetry-chips">
+                    <div class="chip" id="chip-cam">
+                        <span class="chip-dot offline"></span>
+                        <span id="chip-cam-text">CAM C-01: OFF</span>
+                    </div>
+                    <div class="chip" id="chip-yolo">
+                        <span class="chip-dot online"></span>
+                        <span id="chip-yolo-text">YOLO Loading...</span>
+                    </div>
+                    <div class="chip" id="chip-backend">
+                        <span class="chip-dot online"></span>
+                        <span>Ranger Dispatch Online</span>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button id="sound-btn" class="icon-action-btn sound-active" onclick="toggleSoundAlert()" title="Toggle Siren & Alert Chime">
+                        <span id="sound-icon">🔊</span>
+                        <span id="sound-label">Sound ON</span>
+                    </button>
+                    <button id="notif-btn" class="icon-action-btn" onclick="requestNotificationPermission()" title="Enable OS Browser Notifications">
+                        <span>🔔</span>
+                        <span id="notif-label">Notify</span>
+                    </button>
+                    <button class="icon-action-btn" onclick="takeSnapshot()" title="Capture High-Res Snapshot">
+                        <span>📸</span>
+                        <span>Snapshot</span>
+                    </button>
+                    <button class="icon-action-btn" onclick="toggleFullscreen()" title="Fullscreen Monitoring Mode">
+                        <span>⛶</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- AI Disclaimer Banner -->
+        <div class="ai-disclaimer-banner">
+            <span class="disclaimer-icon">&#9888;</span>
+            <span>AI identification may be inaccurate. Ranger verification is authoritative.</span>
+            <span class="disclaimer-model" id="disclaimer-model-ver"></span>
+        </div>
+
+        <!-- Command Center Main Deck -->
+        <main class="command-deck">
+            <!-- Left Deck: Primary Video Feed & Surveillance Viewport -->
+            <section class="viewport-deck">
+                <div class="viewport-header">
+                    <div class="cam-info-wrap">
+                        <div class="cam-id-badge">CAM C-01</div>
+                        <div class="cam-title-group">
+                            <h2>Zone A · Mudumalai Wildlife Perimeter Sentinel</h2>
+                            <span id="stream-state-badge" class="stream-pill offline">STANDBY</span>
+                        </div>
+                    </div>
+                    <div class="viewport-metrics">
+                        <div class="metric-pill"><span class="m-lbl">FPS</span> <span id="fps-val" class="mono m-val">0.0</span></div>
+                        <div class="metric-pill"><span class="m-lbl">INFER</span> <span id="infer-val" class="mono m-val">--ms</span></div>
+                        <div class="metric-pill"><span class="m-lbl">TIME</span> <span id="clock-val" class="mono m-val">--:--:--</span></div>
+                    </div>
+                </div>
+
+                <!-- Video Screen Viewport -->
+                <div class="video-screen-container" id="video-screen-container">
+                    <img id="video-feed" src="/video_feed" alt="Sentinel Camera Stream">
+
+                    <!-- Tactical HUD Grid Overlay -->
+                    <div class="tactical-hud-grid">
+                        <div class="hud-corner top-left"></div>
+                        <div class="hud-corner top-right"></div>
+                        <div class="hud-corner bottom-left"></div>
+                        <div class="hud-corner bottom-right"></div>
+                        <div class="hud-center-crosshair"></div>
+                    </div>
+
+                    <!-- Floating Alert Toasts Container -->
+                    <div class="floating-alert-container" id="floating-alerts">
+                        <!-- Alert toasts dynamically slide in here on detection -->
+                    </div>
+
+                    <!-- Live Animal Banner Banner (Auto-dismissing) -->
+                    <div class="tactical-threat-banner" id="tactical-threat-banner" style="display: none;">
+                        <div class="banner-pulse-glow"></div>
+                        <div class="banner-inner">
+                            <span class="threat-anim-icon" id="banner-animal-emoji">🚨</span>
+                            <div class="threat-details">
+                                <div class="threat-title" id="banner-animal-title">WILDLIFE DETECTED IN ZONE A</div>
+                                <div class="threat-desc" id="banner-animal-desc">High-confidence detection verified. Broadcast dispatched to all nearby tourists & rangers.</div>
+                            </div>
+                            <span class="threat-live-tag">LIVE ALERT</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Viewport Footer Toolbar -->
+                <div class="viewport-footer">
+                    <div class="footer-left">
+                        <div class="filter-toggles">
+                            <button class="filter-btn active" onclick="setVideoFilter('normal')">Standard</button>
+                            <button class="filter-btn" onclick="setVideoFilter('night-vision')">Night Vision</button>
+                            <button class="filter-btn" onclick="setVideoFilter('contrast')">High Contrast</button>
+                        </div>
+                        <div class="geo-tag mono">
+                            📍 11.5690° N, 76.6320° E · Elevation: 914m · Mudumalai Core Zone
+                        </div>
+                    </div>
+                    <div class="footer-right">
+                        <button id="quick-stream-toggle" class="stream-master-btn start" onclick="toggleCamera()">
+                            <span class="btn-icon">▶</span>
+                            <span id="quick-stream-text">START SURVEILLANCE</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Deck: Tactical Operations, Telemetry, & Incident Log -->
+            <aside class="operations-deck">
+                <!-- 1. Live Telemetry Matrix -->
+                <div class="deck-card telemetry-matrix-card">
+                    <div class="card-header">
+                        <h3>📊 Sentinel Telemetry</h3>
+                        <span class="badge-pulse-green">REAL-TIME</span>
+                    </div>
+                    <div class="telemetry-grid">
+                        <div class="telemetry-item">
+                            <span class="t-val mono" id="stat-total-detections">0</span>
+                            <span class="t-lbl">Total Detections</span>
+                        </div>
+                        <div class="telemetry-item highlight">
+                            <span class="t-val mono text-cyan" id="stat-dispatched-alerts">0</span>
+                            <span class="t-lbl">Alerts Dispatched</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-val mono text-amber" id="stat-inference-ms">--</span>
+                            <span class="t-lbl">Inference Speed</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-val mono text-emerald" id="stat-detection-fps">~30</span>
+                            <span class="t-lbl">Stream Rate (FPS)</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-val mono text-purple" id="stat-model-name">--</span>
+                            <span class="t-lbl">AI Model</span>
+                        </div>
+                        <div class="telemetry-item">
+                            <span class="t-val mono" id="stat-device">CPU</span>
+                            <span class="t-lbl">Device</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Real-Time Incident Stream -->
+                <div class="deck-card incident-stream-card">
+                    <div class="card-header">
+                        <div class="title-with-counter">
+                            <h3>🚨 Live Incident Stream</h3>
+                            <span id="incident-counter" class="counter-badge">0</span>
+                        </div>
+                        <div style="display:flex; gap:6px; align-items:center;">
+                            <span class="auto-dispatch-badge">⚡ Auto-Dispatched</span>
+                            <button class="preset-pill" style="padding:2px 8px; font-size:0.65rem;" onclick="clearIncidentLogs()" title="Clear previous detection history">Clear</button>
+                        </div>
+                    </div>
+                    <p class="card-sub">Every detected animal is continuously transmitted to rangers & tourists in real time.</p>
+
+                    <div class="incident-feed-container" id="incident-feed">
+                        <div class="incident-empty-state">
+                            <div class="empty-radar-anim"></div>
+                            <span class="empty-title">Scanning Forest Perimeter...</span>
+                            <span class="empty-sub">Surveillance active. Wildlife detections will stream live here.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Confidence Threshold Tuner -->
+                <div class="deck-card threshold-tuner-card">
+                    <div class="card-header">
+                        <h3>🎯 Confidence Threshold Tuner</h3>
+                        <span id="threshold-display-badge" class="threshold-badge mono">50%</span>
+                    </div>
+                    <p class="card-sub">Adjust minimum AI confidence threshold for instant automated alert broadcast.</p>
+
+                    <div class="threshold-slider-box">
+                        <div class="slider-track-wrap">
+                            <span class="slider-limit-label mono">10%</span>
+                            <input
+                                type="range"
+                                id="threshold-range-input"
+                                min="10"
+                                max="95"
+                                value="50"
+                                step="1"
+                                oninput="onThresholdSliderInput(this.value)"
+                                onchange="onThresholdSliderChange(this.value)"
+                            />
+                            <span class="slider-limit-label mono">95%</span>
+                        </div>
+
+                        <div class="threshold-preset-grid">
+                            <button class="preset-pill" onclick="applyThresholdPreset(0.35)">Low 35%</button>
+                            <button class="preset-pill active" onclick="applyThresholdPreset(0.50)">Balanced 50%</button>
+                            <button class="preset-pill" onclick="applyThresholdPreset(0.65)">Precision 65%</button>
+                            <button class="preset-pill" onclick="applyThresholdPreset(0.80)">Strict 80%</button>
+                        </div>
+                        <div id="threshold-feedback-msg" class="threshold-toast" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <!-- 4. Hardware Master Switch Card -->
+                <div class="deck-card hardware-card">
+                    <div class="card-header">
+                        <h3>📷 Camera Hardware</h3>
+                        <span id="hw-status-indicator" class="hw-badge offline">Stopped</span>
+                    </div>
+                    <p class="card-sub">Webcam hardware is released when stopped to conserve compute & power.</p>
+                    <button id="master-cam-toggle-btn" class="cam-action-btn start" onclick="toggleCamera()">
+                        <span class="cam-action-icon">▶</span>
+                        <span class="cam-action-text">START SURVEILLANCE</span>
+                    </button>
+                    <div id="cam-feedback-msg" class="cam-feedback-msg" style="display:none;"></div>
+                </div>
+            </aside>
+        </main>
+    </div>
+
+    <!-- Web Application Logic -->
+    <script src="/app.js"></script>
+</body>
+</html>

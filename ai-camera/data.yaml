@@ -1,0 +1,13 @@
+# ForestGuard Wildlife Detection Dataset Configuration
+# Used for fine-tuning YOLO11n on 5 target wildlife classes.
+
+train: datasets/wildlife/images/train
+val: datasets/wildlife/images/val
+
+nc: 5
+names:
+  0: tiger
+  1: elephant
+  2: lion
+  3: leopard
+  4: bear

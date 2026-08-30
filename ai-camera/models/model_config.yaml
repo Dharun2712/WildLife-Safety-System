@@ -1,0 +1,33 @@
+# ForestGuard Wildlife Detection - Model Configuration
+# This file tracks the active model metadata for the AI camera pipeline.
+
+model_name: "forestguard_wildlife"
+model_architecture: "YOLO11n"
+model_version: "1.0.0"
+training_date: "pending"
+export_format: "pytorch"
+
+# Target classes (must match training data.yaml)
+classes:
+  0: tiger
+  1: elephant
+  2: lion
+  3: leopard
+  4: bear
+num_classes: 5
+
+# Training hyperparameters (for reference)
+training:
+  base_model: "yolo11n.pt"
+  epochs: 50
+  imgsz: 640
+  batch_size: 16
+  optimizer: "auto"
+  lr0: 0.01
+
+# Inference defaults
+inference:
+  confidence_threshold: 0.35
+  verification_threshold: 0.70
+  iou_threshold: 0.45
+  imgsz: 640
