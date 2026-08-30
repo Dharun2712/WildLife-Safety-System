@@ -5,6 +5,7 @@ verification status workflow, and instant alert dispatching.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import logging
 import os
@@ -51,15 +52,6 @@ camera = CameraService()
 yolo = YOLOService()
 api_client = APIClient()
 
-# FastAPI application for Sentinel Command Center
-app = FastAPI(title="ForestGuard AI Sentinel Command Center")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 # Web directory
 WEB_DIR = Path(__file__).parent / "web"
 
@@ -68,6 +60,118 @@ WEB_DIR = Path(__file__).parent / "web"
 
 class ThresholdRequest(BaseModel):
     threshold: float
+
+
+# --- Continuous Autonomous Detection & Heartbeat Workers ---
+
+def heartbeat_loop():
+    """Periodic camera heartbeat dispatch."""
+    while True:
+        try:
+            api_client.send_heartbeat()
+        except Exception as e:
+            logger.warning(f"⚠️ [BACKEND UNAVAILABLE - RETRYING] Heartbeat error: {e}")
+        time.sleep(HEARTBEAT_INTERVAL)
+
+
+def auto_detect_loop():
+    """
+    Continuous unblocked AI detection & dispatch worker.
+    Processes live webcam frames, identifies wildlife threats,
+    and immediately dispatches notifications to tourists and rangers
+    without waiting for acknowledgment.
+
+    VERIFIED detections → full danger zone + alert (rangers + tourists)
+    NEEDS_VERIFICATION detections → alert rangers only for review
+    """
+    last_sent_timestamps = {}
+
+    while True:
+        try:
+            if camera.is_running and yolo.is_loaded:
+                frame = camera.get_frame()
+                if frame is not None:
+                    detections = yolo.detect(frame)
+
+                    for det in detections:
+                        now = time.time()
+                        last_sent = last_sent_timestamps.get(det.animal_type, 0.0)
+
+                        logger.info(
+                            f"🔍 [WILDLIFE DETECTED] {det.animal_type.upper()} "
+                            f"({det.confidence:.1%} conf) [{det.verification_status}]"
+                        )
+
+                        # Send notification immediately with 0.8s debounce per animal type
+                        if now - last_sent >= 0.8:
+                            last_sent_timestamps[det.animal_type] = now
+                            payload = det.to_payload()
+
+                            # Dispatch to backend
+                            res = api_client.send_detection(payload)
+                            if res:
+                                yolo.record_alert_dispatched()
+        except Exception as e:
+            logger.error(f"Error in continuous detection loop: {e}")
+
+        time.sleep(DETECTION_INTERVAL)
+
+
+# --- Lifecycle Events ---
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize Sentinel services on launch."""
+    logger.info("=" * 60)
+    logger.info(f"ForestGuard Sentinel Command Center - Camera {CAMERA_ID}")
+    logger.info(f"  Name: {CAMERA_NAME} ({FOREST_ZONE})")
+    logger.info(f"  Coordinates: ({CAMERA_LATITUDE}, {CAMERA_LONGITUDE})")
+    logger.info(f"  Monitor Web Console: http://localhost:{MONITOR_PORT}")
+    logger.info(f"  Model Path: {MODEL_PATH}")
+    logger.info(f"  Inference Device: {DEVICE}")
+    logger.info(f"  Inference Size: {yolo.inference_imgsz}x{yolo.inference_imgsz}")
+    logger.info(f"  Confidence Threshold: {yolo.get_threshold():.0%}")
+    logger.info(f"  Verification Threshold: {yolo.verification_threshold:.0%}")
+    logger.info("=" * 60)
+
+    # Load YOLO model
+    logger.info("Initializing YOLO wildlife detection model...")
+    if yolo.load_model():
+        logger.info(f"🤖 [YOLO MODEL READY] Model loaded: {yolo.model_name} v{yolo.model_version}")
+    else:
+        logger.warning(f"⚠️ [YOLO MODEL FAILED] Error: {yolo.error_message}")
+
+    # Clear previous history on fresh launch
+    yolo.clear_history()
+
+    # Check backend connectivity
+    logger.info("Verifying ForestGuard backend connection...")
+    if api_client.check_connection():
+        logger.info(f"✅ [BACKEND CONNECTED] Render backend {api_client.backend_url} reachable")
+    else:
+        logger.warning("⚠️ [BACKEND UNAVAILABLE - RETRYING] Render backend not reachable yet - events logged locally")
+
+    # Launch background continuous workers
+    threading.Thread(target=heartbeat_loop, daemon=True).start()
+    threading.Thread(target=auto_detect_loop, daemon=True).start()
+
+    logger.info(f"🟢 [AI CAMERA READY] Sentinel Node running | Monitor: http://localhost:{MONITOR_PORT}")
+
+    yield
+
+    camera.stop()
+    api_client.close()
+    logger.info("🔌 Sentinel AI Node shutdown complete")
+
+
+# FastAPI application for Sentinel Command Center
+app = FastAPI(title="ForestGuard AI Sentinel Command Center", lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 # --- Web UI Routes ---
@@ -237,6 +341,8 @@ async def update_threshold(req: ThresholdRequest):
 async def start_camera():
     """Start camera feed."""
     success = camera.start()
+    if success:
+        logger.info(f"📹 [WEBCAM CONNECTED] Camera index {camera.camera_index} online")
     return {
         "success": success,
         "status": camera.get_status(),
@@ -268,6 +374,8 @@ async def toggle_camera():
         }
     else:
         success = camera.start()
+        if success:
+            logger.info(f"📹 [WEBCAM CONNECTED] Camera index {camera.camera_index} online")
         return {
             "success": success,
             "running": success,
@@ -292,103 +400,6 @@ async def get_snapshot():
 async def get_detection_history():
     """Get full detection event log."""
     return {"detections": yolo.get_history()}
-
-
-# --- Continuous Autonomous Detection Worker ---
-
-def heartbeat_loop():
-    """Periodic camera heartbeat dispatch."""
-    while True:
-        api_client.send_heartbeat()
-        time.sleep(HEARTBEAT_INTERVAL)
-
-
-def auto_detect_loop():
-    """
-    Continuous unblocked AI detection & dispatch worker.
-    Processes live webcam frames, identifies wildlife threats,
-    and immediately dispatches notifications to tourists and rangers
-    without waiting for acknowledgment.
-
-    VERIFIED detections → full danger zone + alert (rangers + tourists)
-    NEEDS_VERIFICATION detections → alert rangers only for review
-    """
-    last_sent_timestamps = {}
-
-    while True:
-        try:
-            if camera.is_running and yolo.is_loaded:
-                frame = camera.get_frame()
-                if frame is not None:
-                    detections = yolo.detect(frame)
-
-                    for det in detections:
-                        now = time.time()
-                        last_sent = last_sent_timestamps.get(det.animal_type, 0.0)
-
-                        # Send notification immediately with 0.8s debounce per animal type
-                        if now - last_sent >= 0.8:
-                            last_sent_timestamps[det.animal_type] = now
-                            payload = det.to_payload()
-
-                            # Dispatch to backend
-                            res = api_client.send_detection(payload)
-                            if res:
-                                yolo.record_alert_dispatched()
-                                status_tag = det.verification_status
-                                logger.info(
-                                    f"[DETECTION] {det.animal_type.upper()} "
-                                    f"({det.confidence:.1%} conf) [{status_tag}] "
-                                    f"-> Dispatched to backend"
-                                )
-        except Exception as e:
-            logger.error(f"Error in continuous detection loop: {e}")
-
-        time.sleep(DETECTION_INTERVAL)
-
-
-# --- Lifecycle Events ---
-
-@app.on_event("startup")
-async def startup():
-    """Initialize Sentinel services on launch."""
-    logger.info("=" * 60)
-    logger.info(f"ForestGuard Sentinel Command Center - Camera {CAMERA_ID}")
-    logger.info(f"  Name: {CAMERA_NAME} ({FOREST_ZONE})")
-    logger.info(f"  Coordinates: ({CAMERA_LATITUDE}, {CAMERA_LONGITUDE})")
-    logger.info(f"  Monitor Web Console: http://localhost:{MONITOR_PORT}")
-    logger.info(f"  Model Path: {MODEL_PATH}")
-    logger.info(f"  Inference Device: {DEVICE}")
-    logger.info(f"  Inference Size: {yolo.inference_imgsz}x{yolo.inference_imgsz}")
-    logger.info(f"  Confidence Threshold: {yolo.get_threshold():.0%}")
-    logger.info(f"  Verification Threshold: {yolo.verification_threshold:.0%}")
-    logger.info("=" * 60)
-
-    # Load YOLO model
-    logger.info("Initializing YOLO wildlife detection model...")
-    yolo.load_model()
-
-    # Clear previous history on fresh launch
-    yolo.clear_history()
-
-    # Check backend connectivity
-    logger.info("Verifying ForestGuard backend connection...")
-    if api_client.check_connection():
-        logger.info("Backend connected and ready to receive real-time alerts")
-    else:
-        logger.warning("Backend not reachable - events will be logged locally")
-
-    # Launch background continuous workers
-    threading.Thread(target=heartbeat_loop, daemon=True).start()
-    threading.Thread(target=auto_detect_loop, daemon=True).start()
-
-    logger.info(f"Sentinel AI Node READY | Model: {yolo.model_name} v{yolo.model_version} | Device: {DEVICE}")
-
-
-@app.on_event("shutdown")
-async def shutdown():
-    camera.stop()
-    api_client.close()
 
 
 if __name__ == "__main__":

@@ -54,7 +54,7 @@ class CameraService:
 
                     ret, test_frame = cap.read()
                     if ret and test_frame is not None:
-                        logger.info(f"✅ Camera online at index {idx} ({test_frame.shape[1]}x{test_frame.shape[0]} @ 30 FPS)")
+                        logger.info(f"📹 [WEBCAM CONNECTED] Camera online at index {idx} ({test_frame.shape[1]}x{test_frame.shape[0]} @ 30 FPS)")
                         self.camera_index = idx
                         return cap
                     cap.release()

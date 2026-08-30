@@ -205,7 +205,7 @@ class YOLOService:
             self.is_loaded = True
             self.error_message = None
             logger.info(
-                f"YOLO initialized: {self.model_name} v{self.model_version} "
+                f"🤖 [YOLO MODEL READY] Initialized: {self.model_name} v{self.model_version} "
                 f"(imgsz: {self.inference_imgsz}, threshold: {self.confidence_threshold:.0%}, "
                 f"device: {self.device}, fine-tuned: {self.is_fine_tuned})"
             )

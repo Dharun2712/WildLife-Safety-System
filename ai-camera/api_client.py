@@ -31,6 +31,8 @@ class APIClient:
         try:
             response = self._client.get(f"{self.backend_url}/health")
             if response.status_code == 200:
+                if not self.is_connected:
+                    logger.info(f"✅ [BACKEND CONNECTED] Render FastAPI reachable at {self.backend_url}")
                 self.is_connected = True
                 self.last_error = None
                 self._retry_count = 0
@@ -38,6 +40,10 @@ class APIClient:
         except Exception as e:
             self.last_error = str(e)
 
+        if self.is_connected:
+            logger.warning(f"⚠️ [BACKEND UNAVAILABLE - RETRYING] Connection lost to {self.backend_url}: {self.last_error}")
+        else:
+            logger.warning(f"⚠️ [BACKEND UNAVAILABLE - RETRYING] Cannot reach {self.backend_url}")
         self.is_connected = False
         return False
 
@@ -63,32 +69,31 @@ class APIClient:
                 v_status = payload.get('verification_status', 'unknown')
                 model_ver = payload.get('model_version', 'unknown')
                 logger.info(
-                    f"Detection sent: {payload['animal_type']} "
-                    f"(conf: {payload['confidence']:.0%}, "
-                    f"status: {v_status}, model: {model_ver})"
+                    f"✅ [DETECTION SENT TO BACKEND] {payload['animal_type'].upper()} "
+                    f"(conf: {payload['confidence']:.0%}, status: {v_status}, model: {model_ver})"
                 )
                 return data
             else:
                 self.last_error = f"HTTP {response.status_code}: {response.text[:200]}"
-                logger.warning(f"Detection rejected: {self.last_error}")
+                logger.warning(f"⚠️ [DETECTION REJECTED] {self.last_error}")
                 return None
 
         except httpx.TimeoutException:
             self.last_error = "Request timed out"
             self.is_connected = False
-            logger.error("Detection send timeout")
+            logger.error("⚠️ [BACKEND UNAVAILABLE - RETRYING] Detection send timeout")
             return None
 
         except httpx.ConnectError:
             self.last_error = "Cannot connect to backend"
             self.is_connected = False
-            logger.error("Backend connection failed")
+            logger.error("⚠️ [BACKEND UNAVAILABLE - RETRYING] Connection failed")
             return None
 
         except Exception as e:
             self.last_error = str(e)
             self.is_connected = False
-            logger.error(f"Detection send error: {e}")
+            logger.error(f"⚠️ [BACKEND UNAVAILABLE - RETRYING] Error: {e}")
             return None
 
     def send_heartbeat(self) -> bool:
@@ -96,10 +101,17 @@ class APIClient:
         try:
             response = self._client.post(HEARTBEAT_ENDPOINT, timeout=5.0)
             if response.status_code == 200:
+                if not self.is_connected:
+                    logger.info(f"✅ [BACKEND CONNECTED] Heartbeat acknowledged by Render")
                 self.is_connected = True
+                logger.info("💓 [HEARTBEAT SENT] Camera C-01 online heartbeat acknowledged by Render backend")
                 return True
+            else:
+                logger.warning(f"⚠️ [HEARTBEAT FAILED] HTTP {response.status_code}")
         except Exception as e:
             self.last_error = str(e)
+            if self.is_connected:
+                logger.warning(f"⚠️ [BACKEND UNAVAILABLE - RETRYING] Heartbeat failed: {e}")
             self.is_connected = False
 
         return False
