@@ -22,7 +22,7 @@ class APIClient:
         self.is_connected = False
         self.last_error = None
         self.last_success_time = None
-        self._client = httpx.Client(timeout=10.0)
+        self._client = httpx.Client(timeout=10.0, follow_redirects=True)
         self._retry_count = 0
         self._max_retries = 3
 

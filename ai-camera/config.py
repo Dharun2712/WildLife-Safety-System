@@ -21,7 +21,7 @@ CAMERA_LONGITUDE = float(os.getenv("CAMERA_LONGITUDE", "76.6320"))
 FOREST_ZONE = os.getenv("FOREST_ZONE", "Zone A")
 
 # ─── Backend Service ────────────────────────────────────────────────
-BACKEND_URL = os.getenv("CAMERA_BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = os.getenv("CAMERA_BACKEND_URL", "https://wildlife-safety-system.onrender.com").rstrip("/")
 DETECTION_ENDPOINT = f"{BACKEND_URL}/api/wildlife/detections"
 HEARTBEAT_ENDPOINT = f"{BACKEND_URL}/api/cameras/{CAMERA_ID}/heartbeat"
 
