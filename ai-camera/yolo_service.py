@@ -271,11 +271,11 @@ class YOLOService:
 
         start_time = time.time()
         try:
-            # Run YOLO inference
+            # Run YOLO inference with exact user confidence threshold
             results = self.model(
                 frame,
                 verbose=False,
-                conf=max(0.15, self.confidence_threshold * 0.5),  # Low threshold for candidate retrieval
+                conf=self.confidence_threshold,
                 iou=0.45,
                 imgsz=self.inference_imgsz,
                 device=self.device,
