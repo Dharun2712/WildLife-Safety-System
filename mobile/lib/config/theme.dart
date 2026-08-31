@@ -11,37 +11,34 @@ class AppTheme {
   static const Color primaryFixed = Color(0xFFC1ECD4);
   static const Color primaryFixedDim = Color(0xFFA5D0B9);
   
-  static const Color secondary = Color(0xFF0E6C4A);
-  static const Color secondaryContainer = Color(0xFFA0F4C8);
-  static const Color onSecondaryContainer = Color(0xFF19724F);
-  static const Color secondaryFixedDim = Color(0xFF85D7AD);
+  static const Color secondary = Color(0xFF006C48);
+  static const Color secondaryContainer = Color(0xFF92F7C3);
+  static const Color onSecondaryContainer = Color(0xFF00734D);
+  static const Color secondaryFixedDim = Color(0xFF75DAA8);
 
-  static const Color surface = Color(0xFFF4FAFD); // Stitch Light Surface
-  static const Color surfaceDim = Color(0xFFD4DBDD);
-  static const Color surfaceBright = Color(0xFFF4FAFD);
-  static const Color surfaceContainerLow = Color(0xFFEEF5F7);
-  static const Color surfaceContainer = Color(0xFFE8EFF1);
-  static const Color surfaceContainerHigh = Color(0xFFE2E9EC);
-  static const Color surfaceContainerHighest = Color(0xFFDDE4E6);
+  static const Color surface = Color(0xFFF9FAF6); // Soft Sage Light Surface
+  static const Color surfaceContainerLow = Color(0xFFF3F4F0);
+  static const Color surfaceContainer = Color(0xFFEDEEEA);
+  static const Color surfaceContainerHigh = Color(0xFFE7E9E5);
+  static const Color surfaceContainerHighest = Color(0xFFE2E3DF);
   static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFDDE4E6);
+  static const Color surfaceVariant = Color(0xFFE2E3DF);
 
   static const Color error = Color(0xFFBA1A1A); // Stitch Emergency Red
   static const Color errorContainer = Color(0xFFFFDAD6);
   static const Color onErrorContainer = Color(0xFF93000A);
 
-  static const Color tertiary = Color(0xFF002D1C);
-  static const Color tertiaryContainer = Color(0xFF00452E);
-  static const Color tertiaryFixedDim = Color(0xFF95D4B3);
+  static const Color tertiaryFixedDim = Color(0xFFFFBA27); // Amber Warning
+  static const Color tertiaryContainer = Color(0xFF503700);
 
-  static const Color onSurface = Color(0xFF161D1F);
+  static const Color onSurface = Color(0xFF1A1C1A);
   static const Color onSurfaceVariant = Color(0xFF414844);
   static const Color outline = Color(0xFF717973);
   static const Color outlineVariant = Color(0xFFC1C8C2);
-  static const Color inverseSurface = Color(0xFF2B3234);
+  static const Color inverseSurface = Color(0xFF2E312F);
 
   // Quick Semantic Helpers
-  static const Color safeGreen = Color(0xFF0E6C4A);
+  static const Color safeGreen = Color(0xFF006C48);
   static const Color approachingAmber = Color(0xFFD89B00);
   static const Color dangerRed = Color(0xFFBA1A1A);
   static const Color infoBlue = Color(0xFF1D4ED8);
@@ -66,7 +63,7 @@ class AppTheme {
   static const LinearGradient emeraldGlow = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF012D1D), Color(0xFF0E6C4A)],
+    colors: [Color(0xFF012D1D), Color(0xFF006C48)],
   );
 
   static const LinearGradient emergencyGradient = LinearGradient(
@@ -78,7 +75,7 @@ class AppTheme {
   static const LinearGradient secondaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF0E6C4A), Color(0xFF19724F)],
+    colors: [Color(0xFF006C48), Color(0xFF00734D)],
   );
 
   static const LinearGradient rangerGradient = LinearGradient(
@@ -98,6 +95,7 @@ class AppTheme {
     ];
   }
 
+  // ─── Stitch Elevation & Ambient Shadows ───────────────────────
   static List<BoxShadow> ambientShadow = [
     BoxShadow(
       color: const Color(0xFF1B4332).withValues(alpha: 0.08),
@@ -134,28 +132,6 @@ class AppTheme {
     }
   }
 
-  // Compatibility Tokens
-  static const LinearGradient forestGradient = primaryGradient;
-  static const LinearGradient dangerGradient = emergencyGradient;
-  static const Color textPrimary = onSurface;
-  static const Color textSecondary = onSurfaceVariant;
-  static List<BoxShadow> elevatedShadow = ambientShadow;
-
-  static LinearGradient getStatusGradient(String status) {
-    switch (status.toLowerCase()) {
-      case 'safe':
-        return secondaryGradient;
-      case 'approaching':
-        return const LinearGradient(colors: [approachingAmber, Color(0xFFB78100)]);
-      case 'inside':
-      case 'active':
-      case 'danger':
-        return emergencyGradient;
-      default:
-        return primaryGradient;
-    }
-  }
-
   // ─── Flutter ThemeData (Google Stitch Specification) ─────────
   static ThemeData get lightTheme {
     final colorScheme = ColorScheme.fromSeed(
@@ -180,7 +156,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: surface,
-      textTheme: GoogleFonts.plusJakartaSansTextTheme().apply(
+      textTheme: GoogleFonts.interTextTheme().apply(
         bodyColor: onSurface,
         displayColor: onSurface,
       ),
@@ -190,7 +166,7 @@ class AppTheme {
         elevation: 0,
         centerTitle: true,
         scrolledUnderElevation: 1,
-        titleTextStyle: GoogleFonts.plusJakartaSans(
+        titleTextStyle: GoogleFonts.inter(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: primary,
@@ -199,17 +175,17 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         color: surfaceContainerLowest,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: secondary,
+          backgroundColor: primary,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: const StadiumBorder(),
-          textStyle: GoogleFonts.plusJakartaSans(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.inter(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -220,8 +196,8 @@ class AppTheme {
           foregroundColor: primary,
           side: const BorderSide(color: primary, width: 1.5),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          shape: const StadiumBorder(),
-          textStyle: GoogleFonts.plusJakartaSans(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.inter(
             fontSize: 15,
             fontWeight: FontWeight.w600,
           ),
@@ -231,15 +207,15 @@ class AppTheme {
         filled: true,
         fillColor: surfaceContainerLow,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: outlineVariant),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: outlineVariant),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: primary, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -250,9 +226,9 @@ class AppTheme {
         indicatorColor: secondaryContainer,
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w700, color: onSecondaryContainer);
+            return GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: onSecondaryContainer);
           }
-          return GoogleFonts.plusJakartaSans(fontSize: 12, fontWeight: FontWeight.w500, color: onSurfaceVariant);
+          return GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: onSurfaceVariant);
         }),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {

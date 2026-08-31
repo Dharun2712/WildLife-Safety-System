@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 import '../../providers/providers.dart';
 
-/// ForestGuard - Welcome Back Sign In Screen (Image 1)
 class LoginScreen extends ConsumerStatefulWidget {
   final String role;
   const LoginScreen({super.key, required this.role});
@@ -13,17 +12,28 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameCtl = TextEditingController();
   final _passwordCtl = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = false;
+  late AnimationController _animController;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..forward();
+  }
 
   @override
   void dispose() {
     _usernameCtl.dispose();
     _passwordCtl.dispose();
+    _animController.dispose();
     super.dispose();
   }
 
@@ -50,231 +60,262 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
+    final isRanger = widget.role == 'ranger';
+    final accentGradient = isRanger ? AppTheme.rangerGradient : AppTheme.emeraldGlow;
+    final accentColor = isRanger ? AppTheme.rangerBlue : AppTheme.forestGreen;
 
     return Scaffold(
-      backgroundColor: AppTheme.surface,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Floating White Auth Card (Image 1)
-                Container(
-                  width: double.infinity,
-                  constraints: const BoxConstraints(maxWidth: 400),
-                  padding: const EdgeInsets.all(28),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: AppTheme.ambientShadow,
+      body: Container(
+        color: const Color(0xFFF8FAF9),
+        child: Column(
+          children: [
+            // Gradient header
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.only(
+                top: MediaQuery.of(context).padding.top + 8,
+                left: 16,
+                right: 16,
+                bottom: 32,
+              ),
+              decoration: BoxDecoration(
+                gradient: accentGradient,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(32),
+                  bottomRight: Radius.circular(32),
+                ),
+                boxShadow: AppTheme.glowShadow(accentColor, intensity: 0.15),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Back button
+                  IconButton(
+                    icon: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 20),
+                    ),
+                    onPressed: () => context.go('/role-select'),
                   ),
-                  child: Form(
-                    key: _formKey,
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Circle Logo Emblem with Forest & Deer Shield (Image 1)
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF7FBF8),
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.5)),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Container(
-                                width: 34,
-                                height: 34,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF003822),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.shield_outlined, color: Colors.white, size: 20),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text(
-                                'ForestGuard',
-                                style: TextStyle(fontSize: 8, fontWeight: FontWeight.w900, color: Color(0xFF003822)),
-                              ),
-                            ],
-                          ),
+                        Text(
+                          isRanger ? '🛡️' : '🏕️',
+                          style: const TextStyle(fontSize: 40),
                         ),
-
-                        const SizedBox(height: 20),
-
-                        // Title & Subtitle (Image 1)
-                        const Text(
-                          'Welcome Back',
-                          style: TextStyle(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w900,
-                            color: AppTheme.primary,
+                        const SizedBox(height: 12),
+                        Text(
+                          '${isRanger ? "Ranger" : "Tourist"} Login',
+                          style: const TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
                             letterSpacing: -0.5,
                           ),
                         ),
-                        const SizedBox(height: 6),
-                        const Text(
-                          'Sign in to monitor your safety zones.',
+                        const SizedBox(height: 4),
+                        Text(
+                          'Sign in to your ForestGuard account',
                           style: TextStyle(
-                            fontSize: 13,
-                            color: AppTheme.onSurfaceVariant,
-                          ),
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        // Error Alert if present
-                        if (auth.error != null) ...[
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFFFDAD6),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.error_outline_rounded, color: Color(0xFFBA1A1A), size: 18),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    auth.error!,
-                                    style: const TextStyle(fontSize: 12, color: Color(0xFFBA1A1A), fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-
-                        // Input 1: Email or Phone (Image 1)
-                        TextFormField(
-                          controller: _usernameCtl,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: InputDecoration(
-                            labelText: 'Email or Phone',
-                            hintText: 'Enter your email or phone',
-                            prefixIcon: const Icon(Icons.person_outline_rounded, color: AppTheme.primary, size: 20),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          ),
-                          validator: (v) => v == null || v.isEmpty ? 'Please enter email or phone' : null,
-                        ),
-
-                        const SizedBox(height: 16),
-
-                        // Input 2: Password (Image 1)
-                        TextFormField(
-                          controller: _passwordCtl,
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            hintText: 'Enter your password',
-                            prefixIcon: const Icon(Icons.lock_outline_rounded, color: AppTheme.primary, size: 20),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-                                color: AppTheme.onSurfaceVariant,
-                                size: 20,
-                              ),
-                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                            ),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-                          ),
-                          validator: (v) => v == null || v.isEmpty ? 'Please enter password' : null,
-                        ),
-
-                        const SizedBox(height: 14),
-
-                        // Checkbox Row: Remember me & Forgot Password? (Image 1)
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: Checkbox(
-                                    value: _rememberMe,
-                                    activeColor: AppTheme.primary,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                                    onChanged: (val) => setState(() => _rememberMe = val ?? false),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Remember me',
-                                  style: TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                            GestureDetector(
-                              onTap: () {},
-                              child: const Text(
-                                'Forgot Password?',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.primary),
-                              ),
-                            ),
-                          ],
-                        ),
-
-                        const SizedBox(height: 28),
-
-                        // Primary Login Button (Image 1)
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: auth.isLoading ? null : _login,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: AppTheme.primary,
-                              foregroundColor: Colors.white,
-                              shape: const StadiumBorder(),
-                              elevation: 0,
-                            ),
-                            child: auth.isLoading
-                                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.login_rounded, size: 18),
-                                      SizedBox(width: 8),
-                                      Text('Login', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                          ),
-                        ),
-
-                        const SizedBox(height: 12),
-
-                        // Secondary Sign Up Button (Image 1)
-                        SizedBox(
-                          width: double.infinity,
-                          height: 50,
-                          child: OutlinedButton(
-                            onPressed: () => context.go('/register?role=${widget.role}'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppTheme.primary,
-                              side: BorderSide(color: AppTheme.outlineVariant.withValues(alpha: 0.6)),
-                              shape: const StadiumBorder(),
-                            ),
-                            child: const Text('Sign Up', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 14,
                           ),
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
+
+            // Form body
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                child: AnimatedBuilder(
+                  animation: _animController,
+                  builder: (context, child) {
+                    final slideAnim = Tween<double>(begin: 40, end: 0).animate(
+                      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
+                    );
+                    final fadeAnim = Tween<double>(begin: 0, end: 1).animate(
+                      CurvedAnimation(parent: _animController, curve: Curves.easeIn),
+                    );
+                    return Opacity(
+                      opacity: fadeAnim.value,
+                      child: Transform.translate(
+                        offset: Offset(0, slideAnim.value),
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Error message
+                        if (auth.error != null) ...[
+                          Container(
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppTheme.dangerRed.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(color: AppTheme.dangerRed.withValues(alpha: 0.2)),
+                            ),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.dangerRed.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Icon(Icons.error_outline, color: AppTheme.dangerRed, size: 18),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    auth.error!,
+                                    style: const TextStyle(color: AppTheme.dangerRed, fontSize: 13, fontWeight: FontWeight.w500),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                        ],
+
+                        // Username
+                        Text(
+                          'Username',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _usernameCtl,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your username',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.person_outline_rounded, color: accentColor.withValues(alpha: 0.6)),
+                          ),
+                          validator: (v) => v == null || v.isEmpty ? 'Username is required' : null,
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Password
+                        Text(
+                          'Password',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: _passwordCtl,
+                          obscureText: _obscurePassword,
+                          decoration: InputDecoration(
+                            hintText: 'Enter your password',
+                            hintStyle: TextStyle(color: Colors.grey.shade400),
+                            prefixIcon: Icon(Icons.lock_outline_rounded, color: accentColor.withValues(alpha: 0.6)),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _obscurePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+                                color: Colors.grey.shade500,
+                              ),
+                              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            ),
+                          ),
+                          validator: (v) => v == null || v.isEmpty ? 'Password is required' : null,
+                        ),
+                        const SizedBox(height: 32),
+
+                        // Sign In Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: accentGradient,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: auth.isLoading
+                                  ? null
+                                  : AppTheme.glowShadow(accentColor, intensity: 0.2),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: auth.isLoading ? null : _login,
+                                child: Center(
+                                  child: auth.isLoading
+                                      ? const SizedBox(
+                                          width: 22,
+                                          height: 22,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2.5,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : const Text(
+                                          'Sign In',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w700,
+                                            letterSpacing: 0.3,
+                                          ),
+                                        ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        if (!isRanger) ...[
+                          const SizedBox(height: 20),
+                          Center(
+                            child: TextButton(
+                              onPressed: () => context.go('/register'),
+                              child: RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+                                  children: [
+                                    const TextSpan(text: "Don't have an account? "),
+                                    TextSpan(
+                                      text: 'Register',
+                                      style: TextStyle(
+                                        color: accentColor,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

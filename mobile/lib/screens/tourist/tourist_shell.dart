@@ -7,7 +7,7 @@ import '../../providers/providers.dart';
 import '../../config/constants.dart';
 import '../../widgets/forest_map_view.dart';
 import '../../widgets/detection_alert_modal.dart';
-import 'emergency_help_screen.dart';
+import '../../widgets/sos_active_dialog.dart';
 
 class TouristShell extends ConsumerStatefulWidget {
   const TouristShell({super.key});
@@ -45,7 +45,6 @@ class _TouristShellState extends ConsumerState<TouristShell> {
 
         final data = event['data'] is Map ? Map<String, dynamic>.from(event['data']) : event;
 
-        // Invalidate providers so map and alerts refresh reactively
         ref.invalidate(dangerZonesProvider);
         ref.invalidate(alertsProvider);
         ref.invalidate(safetyStatusProvider);
@@ -56,7 +55,10 @@ class _TouristShellState extends ConsumerState<TouristShell> {
             detection: data,
             isRanger: false,
             onViewOnMap: () {
-              setState(() => _currentIndex = 1); // Switch to OpenStreetMap tab
+              setState(() => _currentIndex = 1);
+            },
+            onTriggerSOS: () {
+              SOSActiveDialog.show(context);
             },
           );
         }
@@ -69,18 +71,37 @@ class _TouristShellState extends ConsumerState<TouristShell> {
     final auth = ref.watch(authProvider);
 
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
+      body: Stack(
         children: [
-          _TouristHomeTab(auth: auth),
-          const _TouristMapTab(),
-          const _TouristAlertsTab(),
-          const _TouristSafetyTab(),
-          _TouristProfileTab(auth: auth, onLogout: () async {
-            final router = GoRouter.of(context);
-            await ref.read(authProvider.notifier).logout();
-            router.go('/role-select');
-          }),
+          IndexedStack(
+            index: _currentIndex,
+            children: [
+              _TouristHomeTab(
+                auth: auth,
+                onViewMap: () => setState(() => _currentIndex = 1),
+              ),
+              const _TouristMapTab(),
+              const _TouristAlertsTab(),
+              const _TouristSafetyTab(),
+              _TouristProfileTab(
+                auth: auth,
+                onLogout: () async {
+                  final router = GoRouter.of(context);
+                  await ref.read(authProvider.notifier).logout();
+                  router.go('/role-select');
+                },
+              ),
+            ],
+          ),
+
+          // Google Stitch Floating SOS Emergency Button (Pulsing Red FAB)
+          Positioned(
+            bottom: 90,
+            right: 18,
+            child: _StitchSOSButton(
+              onPressed: () => SOSActiveDialog.show(context),
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: Container(
@@ -111,301 +132,418 @@ class _TouristShellState extends ConsumerState<TouristShell> {
 }
 
 // ═══════════════════════════════════════════════════
-// TOURIST HOME TAB — Premium Dashboard
+// GOOGLE STITCH SOS BUTTON (Pulsing Red FAB)
 // ═══════════════════════════════════════════════════
-// ═══════════════════════════════════════════════════
-// TOURIST HOME TAB — Premium Dashboard (Images 3, 4, 5)
-// ═══════════════════════════════════════════════════
-class _TouristHomeTab extends ConsumerWidget {
-  final AuthState auth;
-  const _TouristHomeTab({required this.auth});
+class _StitchSOSButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  const _StitchSOSButton({required this.onPressed});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final userName = auth.user?['full_name'] ?? 'Alex';
-    final safetyAsync = ref.watch(safetyStatusProvider);
-    final alertsAsync = ref.watch(alertsProvider);
+  State<_StitchSOSButton> createState() => _StitchSOSButtonState();
+}
 
-    return Scaffold(
-      backgroundColor: AppTheme.surface,
-      appBar: AppBar(
-        backgroundColor: AppTheme.surface,
-        elevation: 0,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16),
-          child: CircleAvatar(
-            backgroundColor: AppTheme.surfaceContainerHigh,
-            backgroundImage: const NetworkImage('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'),
-          ),
-        ),
-        title: const Text(
-          'ForestGuard',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.primary),
-        ),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppTheme.primary),
-            onPressed: () {},
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {},
-        backgroundColor: const Color(0xFFBA1A1A),
-        foregroundColor: Colors.white,
-        elevation: 6,
-        icon: const Icon(Icons.sos_rounded, size: 22),
-        label: const Text('SOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          ref.invalidate(safetyStatusProvider);
-          ref.invalidate(alertsProvider);
-        },
-        child: ListView(
-          padding: const EdgeInsets.all(20),
+class _StitchSOSButtonState extends State<_StitchSOSButton> with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onPressed,
+      child: SizedBox(
+        width: 64,
+        height: 64,
+        child: Stack(
+          alignment: Alignment.center,
           children: [
-            // Greeting & Park Dropdown Selector (Image 4 & Image 5)
-            Text(
-              'Good Morning,\n$userName.',
-              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppTheme.primary, height: 1.1, letterSpacing: -0.5),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Ready for your trail walk.',
-              style: TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 14),
-
-            // Dropdown Park Selector Card (Image 4 & Image 5)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 14,
-                        backgroundImage: NetworkImage('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=400&q=80'),
-                      ),
-                      SizedBox(width: 10),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Current Zone', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant)),
-                          Text('Redwoods National Park', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                        ],
-                      ),
-                    ],
+            // Pulsing Ring
+            AnimatedBuilder(
+              animation: _pulseController,
+              builder: (context, _) {
+                final scale = 1.0 + (_pulseController.value * 0.4);
+                final opacity = 0.5 * (1.0 - _pulseController.value);
+                return Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: AppTheme.error.withValues(alpha: opacity),
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  Icon(Icons.arrow_drop_down, color: AppTheme.primary),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // Hero Safety Banner (Image 4 Safe state vs Image 5 Danger state)
-            safetyAsync.when(
-              data: (status) {
-                final isDanger = status['status'] == 'danger' || status['status'] == 'approaching';
-                return isDanger ? _buildDangerHeroCard() : _buildSafeHeroCard();
+                );
               },
-              loading: () => _buildSafeHeroCard(),
-              error: (_, __) => _buildSafeHeroCard(),
             ),
-
-            const SizedBox(height: 20),
-
-            // Weather & Trail Status Row (Image 3)
-            Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: AppTheme.ambientShadow,
-                    ),
-                    child: const Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Icon(Icons.wb_sunny_outlined, color: AppTheme.onSurfaceVariant, size: 20),
-                            Text('North Sector', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant)),
-                          ],
-                        ),
-                        SizedBox(height: 8),
-                        Text('72°F', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppTheme.primary)),
-                        SizedBox(height: 2),
-                        Text('Moderate UV Index', style: TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
-                      ],
-                    ),
+            // Solid SOS FAB
+            Container(
+              width: 58,
+              height: 58,
+              decoration: BoxDecoration(
+                color: AppTheme.error,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5),
+                boxShadow: AppTheme.sosShadow,
+              ),
+              child: const Center(
+                child: Text(
+                  'SOS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                    letterSpacing: 0.5,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: AppTheme.ambientShadow,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Icon(Icons.hiking_rounded, color: AppTheme.onSurfaceVariant, size: 20),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE5F7ED),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text('• Open', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.secondary)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        const Text('Trails Dry', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                        const SizedBox(height: 2),
-                        const Text('Good visibility today.', style: TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 20),
-
-            // Trail Traffic Banner Card (Image 4)
-            Container(
-              decoration: BoxDecoration(
-                color: AppTheme.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Stack(
-                    children: [
-                      Image.network(
-                        'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80',
-                        height: 120,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
-                      Positioned(
-                        bottom: 8,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Row(
-                            children: [
-                              Icon(Icons.location_on_outlined, color: Colors.white, size: 12),
-                              SizedBox(width: 4),
-                              Text('Current: Northern Ridge Trail', style: TextStyle(color: Colors.white, fontSize: 11)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Trail Traffic', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                        SizedBox(height: 2),
-                        Text('Light activity expected.', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
-
-            const SizedBox(height: 24),
-
-            // Nearby Activity Header & Horizontal Cards (Image 3 & 4)
-            const Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text('Nearby Activity', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-                Text('Expand Map >', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.secondary)),
-              ],
-            ),
-            const SizedBox(height: 12),
-
-            SizedBox(
-              height: 100,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                children: [
-                  _buildActivityCard('Mule Deer', '0.4 mi • West Trail', '15m ago', Icons.pets_rounded, const Color(0xFFE5F7ED), AppTheme.secondary),
-                  const SizedBox(width: 12),
-                  _buildActivityCard('Black Bear', '1.2 mi • Ridge Path', '30m ago', Icons.pets_rounded, const Color(0xFFFFDAD6), const Color(0xFFBA1A1A)),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Safety Reminders List (Image 4)
-            const Text('Safety Reminders', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-            const SizedBox(height: 12),
-
-            Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppTheme.ambientShadow,
-              ),
-              child: Column(
-                children: [
-                  _buildReminderTile(Icons.wb_sunny_outlined, 'Weather Advisory', 'Temperatures dropping after 4 PM.'),
-                  const Divider(height: 1, indent: 60),
-                  _buildReminderTile(Icons.water_drop_outlined, 'Hydration Station', 'Next refill point is 2 miles ahead on path.'),
-                  const Divider(height: 1, indent: 60),
-                  _buildReminderTile(Icons.groups_outlined, 'Stay Together', 'Keep groups tight in dense foliage.'),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
+}
 
-  // Hero Mint Safe Card (Image 4)
-  Widget _buildSafeHeroCard() {
+// ═══════════════════════════════════════════════════
+// TOURIST HOME TAB — Google Stitch Safety Dashboard
+// ═══════════════════════════════════════════════════
+class _TouristHomeTab extends ConsumerWidget {
+  final AuthState auth;
+  final VoidCallback onViewMap;
+  const _TouristHomeTab({required this.auth, required this.onViewMap});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final safetyAsync = ref.watch(safetyStatusProvider);
+    final alertsAsync = ref.watch(alertsProvider);
+    final zonesAsync = ref.watch(dangerZonesProvider);
+    final detectionsAsync = ref.watch(detectionsProvider);
+
+    return Scaffold(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: Colors.white.withValues(alpha: 0.85),
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        title: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: AppTheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Text(
+                  (auth.user?['full_name'] ?? 'T').substring(0, 1).toUpperCase(),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text('ForestGuard', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppTheme.primary)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: AppTheme.primary),
+            onPressed: () {
+              ref.invalidate(safetyStatusProvider);
+              ref.invalidate(alertsProvider);
+              ref.invalidate(dangerZonesProvider);
+            },
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(safetyStatusProvider);
+          ref.invalidate(alertsProvider);
+          ref.invalidate(dangerZonesProvider);
+          ref.invalidate(detectionsProvider);
+        },
+        child: ListView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          children: [
+            // Stitch Safety Status Banner
+            safetyAsync.when(
+              data: (status) => _StitchSafetyBanner(status: status),
+              loading: () => const SizedBox(height: 80, child: Center(child: CircularProgressIndicator())),
+              error: (_, __) => _StitchSafetyBanner(
+                status: {'status': 'safe', 'message': AppConstants.safetyMessages['safe']!},
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Stitch 2-Column Widgets Grid (Weather + Trail)
+            Row(
+              children: [
+                Expanded(
+                  child: _StitchWeatherWidget(),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _StitchTrailWidget(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+
+            // Stitch Nearby Activity Section
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Nearby Activity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+                TextButton.icon(
+                  onPressed: onViewMap,
+                  icon: const Text('Expand Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.secondary)),
+                  label: const Icon(Icons.chevron_right_rounded, size: 18, color: AppTheme.secondary),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+
+            // Map Preview Snippet with Teardrop Badge Marker
+            _StitchMapPreviewCard(onViewMap: onViewMap, zonesAsync: zonesAsync),
+            const SizedBox(height: 16),
+
+            // Recent AI Detections Carousel (Horizontal Scroll Cards)
+            const Text('Recent Detections', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+            const SizedBox(height: 10),
+            detectionsAsync.when(
+              data: (dets) {
+                if (dets.isEmpty) {
+                  return const Card(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Text('No recent wildlife sightings recorded.'),
+                    ),
+                  );
+                }
+                return SizedBox(
+                  height: 120,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: dets.length,
+                    itemBuilder: (ctx, i) {
+                      final d = dets[i];
+                      final animal = d['animal_type'] ?? 'unknown';
+                      final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
+                      final conf = (((d['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
+
+                      return Container(
+                        width: 200,
+                        margin: const EdgeInsets.only(right: 12),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceContainerLowest,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+                          boxShadow: AppTheme.ambientShadow,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Text(emoji, style: const TextStyle(fontSize: 24)),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceContainerHigh,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text('Conf: $conf%', style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                                ),
+                              ],
+                            ),
+                            const Spacer(),
+                            Text(
+                              AppConstants.animalNames[animal] ?? animal,
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.primary),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Camera ${d['camera_id']} • Zone A',
+                              style: const TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox(),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Active Alerts Section
+            const Text('Active Alerts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+            const SizedBox(height: 10),
+            alertsAsync.when(
+              data: (alerts) {
+                final active = alerts.where((a) => a['status'] != 'closed' && a['status'] != 'rejected').toList();
+                if (active.isEmpty) {
+                  return Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppTheme.surfaceContainerLowest,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: AppTheme.ambientShadow,
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle_rounded, color: AppTheme.safeGreen, size: 28),
+                        SizedBox(width: 12),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('All Sectors Normal', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                            Text('No active wildlife proximity warnings', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                          ],
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return Column(
+                  children: active.take(3).map((a) => _StitchAlertCard(alert: a)).toList(),
+                );
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (_, __) => const SizedBox(),
+            ),
+            const SizedBox(height: 80),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Stitch Verified Safety Banner Card
+class _StitchSafetyBanner extends StatelessWidget {
+  final Map<String, dynamic> status;
+  const _StitchSafetyBanner({required this.status});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = (status['status'] as String?) ?? 'safe';
+    final isClear = s == 'safe';
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFA0F4C8),
-        borderRadius: BorderRadius.circular(24),
+        color: isClear ? AppTheme.secondaryContainer.withValues(alpha: 0.4) : AppTheme.errorContainer.withValues(alpha: 0.4),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: (isClear ? AppTheme.secondary : AppTheme.error).withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: (isClear ? AppTheme.secondary : AppTheme.error).withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isClear ? Icons.verified_rounded : Icons.warning_rounded,
+              color: isClear ? AppTheme.secondary : AppTheme.error,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isClear ? 'Safety Status: All Clear' : 'PROXIMITY WARNING',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: isClear ? AppTheme.onSecondaryContainer : AppTheme.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  isClear ? 'Conditions are stable. Enjoy your visit.' : 'Active wildlife detected near your sector.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: (isClear ? AppTheme.onSecondaryContainer : AppTheme.onErrorContainer).withValues(alpha: 0.8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Stitch Weather Widget
+class _StitchWeatherWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+        boxShadow: AppTheme.ambientShadow,
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Icon(Icons.wb_sunny_outlined, color: AppTheme.outline, size: 20),
+              Text('North Sector', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.onSurfaceVariant)),
+            ],
+          ),
+          SizedBox(height: 8),
+          Text('72°F', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+          SizedBox(height: 2),
+          Text('Moderate UV Index', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+// Stitch Trail Condition Widget
+class _StitchTrailWidget extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
         boxShadow: AppTheme.ambientShadow,
       ),
       child: Column(
@@ -414,399 +552,142 @@ class _TouristHomeTab extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              const Icon(Icons.hiking_rounded, color: AppTheme.outline, size: 20),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.6),
+                  color: AppTheme.secondaryContainer.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.circle, color: AppTheme.secondary, size: 8),
-                    SizedBox(width: 6),
-                    Text('LIVE STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.5)),
-                  ],
-                ),
-              ),
-              const Icon(Icons.shield_outlined, color: AppTheme.primary, size: 28),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Row(
-            children: [
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: AppTheme.primary,
-                child: Icon(Icons.shield_rounded, color: Colors.white, size: 16),
-              ),
-              SizedBox(width: 10),
-              Text(
-                'YOU ARE SAFE',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: -0.5),
+                child: const Text('Open', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.onSecondaryContainer)),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            'No active wildlife safety alerts near your current location. Trail conditions are clear.',
-            style: TextStyle(fontSize: 13, color: AppTheme.primary, height: 1.4),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.primary,
-                foregroundColor: Colors.white,
-                shape: const StadiumBorder(),
-                elevation: 0,
-              ),
-              icon: const Icon(Icons.map_outlined, size: 16),
-              label: const Text('View Forest Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-            ),
-          ),
+          const Text('Trails Dry', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+          const SizedBox(height: 2),
+          const Text('Good visibility today.', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
         ],
       ),
-    );
-  }
-
-  // Hero Red Danger Zone Card (Image 5)
-  Widget _buildDangerHeroCard() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: const Color(0xFFBA1A1A),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 4))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 14),
-                SizedBox(width: 6),
-                Text('ACTIVE WILDLIFE SAFETY ZONE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Your current location is within an active wildlife safety zone.',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(width: 3, height: 32, color: Colors.white70),
-              const SizedBox(width: 10),
-              const Expanded(
-                child: Text(
-                  'Remain at a safe location and follow official ranger instructions.',
-                  style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.3),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            height: 44,
-            child: ElevatedButton.icon(
-              onPressed: () {},
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: const Color(0xFFBA1A1A),
-                shape: const StadiumBorder(),
-                elevation: 0,
-              ),
-              icon: const Icon(Icons.map_outlined, size: 16, color: Color(0xFFBA1A1A)),
-              label: const Text('View Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFBA1A1A))),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityCard(String title, String subtitle, String time, IconData icon, Color bg, Color iconColor) {
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppTheme.ambientShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primary), overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 2),
-                Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
-                Text(time, style: const TextStyle(fontSize: 10, color: AppTheme.onSurfaceVariant)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildReminderTile(IconData icon, String title, String subtitle) {
-    return ListTile(
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(color: AppTheme.surfaceContainerHigh, shape: BoxShape.circle),
-        child: Icon(icon, color: AppTheme.primary, size: 18),
-      ),
-      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
-      subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
     );
   }
 }
 
-// Premium alert card with colored accent
-class _PremiumAlertCard extends StatelessWidget {
+// Map Preview Snippet
+class _StitchMapPreviewCard extends StatelessWidget {
+  final VoidCallback onViewMap;
+  final AsyncValue<List<Map<String, dynamic>>> zonesAsync;
+  const _StitchMapPreviewCard({required this.onViewMap, required this.zonesAsync});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onViewMap,
+      child: Container(
+        height: 160,
+        decoration: BoxDecoration(
+          color: AppTheme.primaryContainer,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+          boxShadow: AppTheme.ambientShadow,
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            ForestMapView(
+              dangerZones: zonesAsync.value ?? [],
+              alerts: const [],
+              isRanger: false,
+            ),
+            // Glass Overlay Banner
+            Positioned(
+              bottom: 10,
+              left: 10,
+              right: 10,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.9),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.my_location_rounded, color: AppTheme.primary, size: 16),
+                    SizedBox(width: 8),
+                    Text('Mudumalai Sector 4 • GPS Online', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+                    Spacer(),
+                    Icon(Icons.open_in_full_rounded, size: 16, color: AppTheme.primary),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Stitch Alert Card
+class _StitchAlertCard extends StatelessWidget {
   final Map<String, dynamic> alert;
-  const _PremiumAlertCard({required this.alert});
+  const _StitchAlertCard({required this.alert});
 
   @override
   Widget build(BuildContext context) {
     final animal = alert['animal_type'] ?? 'unknown';
     final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
-    final confidence = ((alert['confidence'] ?? 0) as num) * 100;
     final status = alert['status'] ?? '';
     final statusColor = AppTheme.getStatusColor(status);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppTheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.elevatedShadow,
+        border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+        boxShadow: AppTheme.ambientShadow,
       ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            // Colored accent strip
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: statusColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    // Animal emoji with colored background
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: (AppTheme.animalColors[animal] ?? Colors.grey).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 26))),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${AppConstants.animalNames[animal] ?? animal} Detected',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Confidence: ${confidence.toStringAsFixed(0)}%',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: statusColor.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: statusColor.withValues(alpha: 0.2)),
-                      ),
-                      child: Text(
-                        status.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          color: statusColor,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Premium danger zone card
-class _PremiumDangerZoneCard extends StatelessWidget {
-  final Map<String, dynamic> zone;
-  const _PremiumDangerZoneCard({required this.zone});
-
-  @override
-  Widget build(BuildContext context) {
-    final animal = zone['animal_type'] ?? 'unknown';
-    final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
-    final radius = zone['radius_meters'] ?? 0;
-    final isSim = zone['is_simulation'] == true;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.elevatedShadow,
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              decoration: const BoxDecoration(
-                color: AppTheme.dangerRed,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  bottomLeft: Radius.circular(16),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppTheme.dangerRed.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Center(child: Text(emoji, style: const TextStyle(fontSize: 26))),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${AppConstants.animalNames[animal]} Zone${isSim ? " (SIM)" : ""}',
-                            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            'Radius: ${radius}m',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Pulsing danger indicator
-                    Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: AppTheme.dangerRed,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppTheme.dangerRed.withValues(alpha: 0.4),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Empty state card
-class _EmptyStateCard extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-
-  const _EmptyStateCard({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(28),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.elevatedShadow,
-      ),
-      child: Column(
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(12),
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(16),
+              color: statusColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: color, size: 32),
+            child: Center(child: Text(emoji, style: const TextStyle(fontSize: 24))),
           ),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-          const SizedBox(height: 4),
-          Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${AppConstants.animalNames[animal] ?? animal} Proximity Alert',
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.primary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Zone ${alert['zone_code'] ?? 'A'} • ${alert['verification_status'] ?? status}',
+                  style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              status.toUpperCase(),
+              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: statusColor),
+            ),
+          ),
         ],
       ),
     );
@@ -814,7 +695,7 @@ class _EmptyStateCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════
-// TOURIST MAP TAB
+// MAP TAB
 // ═══════════════════════════════════════════════════
 class _TouristMapTab extends ConsumerWidget {
   const _TouristMapTab();
@@ -825,60 +706,14 @@ class _TouristMapTab extends ConsumerWidget {
     final alertsAsync = ref.watch(alertsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Forest Map')),
+      appBar: AppBar(title: const Text('Live Forest Map')),
       body: zonesAsync.when(
         data: (zones) {
           final alerts = alertsAsync.value ?? [];
-          return Stack(
-            children: [
-              ForestMapView(
-                dangerZones: zones,
-                alerts: alerts,
-                isRanger: false,
-              ),
-              if (zones.isNotEmpty)
-                Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    constraints: const BoxConstraints(maxHeight: 190),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, -4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Drag handle
-                        Container(
-                          margin: const EdgeInsets.only(top: 10, bottom: 8),
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                        Expanded(
-                          child: ListView(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            shrinkWrap: true,
-                            children: zones.map((z) => _PremiumDangerZoneCard(zone: z)).toList(),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
+          return ForestMapView(
+            dangerZones: zones,
+            alerts: alerts,
+            isRanger: false,
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -889,30 +724,76 @@ class _TouristMapTab extends ConsumerWidget {
 }
 
 // ═══════════════════════════════════════════════════
-// TOURIST ALERTS TAB (Matching Image 1: Approaching Wildlife Alert View)
+// ALERTS TAB
 // ═══════════════════════════════════════════════════
-class _TouristAlertsTab extends StatelessWidget {
+class _TouristAlertsTab extends ConsumerWidget {
   const _TouristAlertsTab();
 
   @override
-  Widget build(BuildContext context) {
-    return const EmergencyHelpScreen(isApproachingView: true);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final alertsAsync = ref.watch(alertsProvider);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notifications & Warnings')),
+      body: alertsAsync.when(
+        data: (alerts) {
+          if (alerts.isEmpty) {
+            return const Center(child: Text('No active warnings.'));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: alerts.length,
+            itemBuilder: (_, i) => _StitchAlertCard(alert: alerts[i]),
+          );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (_, __) => const Center(child: Text('Unable to load alerts')),
+      ),
+    );
   }
 }
 
 // ═══════════════════════════════════════════════════
-// TOURIST SAFETY TAB (Matching Image 5: Emergency Help & Safety Protocols)
+// SAFETY TAB
 // ═══════════════════════════════════════════════════
 class _TouristSafetyTab extends StatelessWidget {
   const _TouristSafetyTab();
 
   @override
   Widget build(BuildContext context) {
-    return const EmergencyHelpScreen(isApproachingView: false);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Safety Center')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            child: const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Safety Protocol', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+                SizedBox(height: 12),
+                Text('• Stay on official designated paths.', style: TextStyle(fontSize: 14)),
+                SizedBox(height: 6),
+                Text('• Maintain distance if animals are spotted.', style: TextStyle(fontSize: 14)),
+                SizedBox(height: 6),
+                Text('• Use SOS button immediately in an emergency.', style: TextStyle(fontSize: 14)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
+
 // ═══════════════════════════════════════════════════
-// TOURIST PROFILE TAB
+// PROFILE TAB
 // ═══════════════════════════════════════════════════
 class _TouristProfileTab extends StatelessWidget {
   final AuthState auth;
@@ -922,177 +803,45 @@ class _TouristProfileTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(title: const Text('Profile')),
       body: ListView(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.all(16),
         children: [
-          // Gradient profile header
           Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 16,
-              bottom: 28,
-              left: 24,
-              right: 24,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppTheme.ambientShadow,
             ),
-            decoration: const BoxDecoration(
-              gradient: AppTheme.forestGradient,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(32),
-                bottomRight: Radius.circular(32),
-              ),
-            ),
-            child: Column(
+            child: Row(
               children: [
-                const Text(
-                  'Profile',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: AppTheme.primaryContainer,
+                  child: Text(
+                    (auth.user?['full_name'] ?? 'T').substring(0, 1).toUpperCase(),
+                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                   ),
                 ),
-                const SizedBox(height: 20),
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    color: Colors.white.withValues(alpha: 0.15),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      (auth.user?['full_name'] ?? 'T').substring(0, 1).toUpperCase(),
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  auth.user?['full_name'] ?? 'Tourist',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  auth.user?['email'] ?? '',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withValues(alpha: 0.6),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                  ),
-                  child: const Text(
-                    'TOURIST',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 1.5,
-                    ),
-                  ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(auth.user?['full_name'] ?? 'Tourist', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+                    Text(auth.user?['email'] ?? '', style: const TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant)),
+                  ],
                 ),
               ],
             ),
           ),
-
           const SizedBox(height: 20),
-
-          // Menu items
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
-              child: Column(
-                children: [
-                  _menuItem(Icons.settings_rounded, 'Settings', () {}),
-                  Divider(height: 1, indent: 56, color: Colors.grey.shade100),
-                  _menuItem(Icons.help_outline_rounded, 'Help & Support', () {}),
-                  Divider(height: 1, indent: 56, color: Colors.grey.shade100),
-                  _menuItem(Icons.info_outline_rounded, 'About ForestGuard', () {}),
-                ],
-              ),
-            ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: onLogout,
+            child: const Text('Sign Out'),
           ),
-
-          const SizedBox(height: 16),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
-              child: _menuItem(
-                Icons.logout_rounded,
-                'Logout',
-                onLogout,
-                isDestructive: true,
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
         ],
-      ),
-    );
-  }
-
-  Widget _menuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
-    final color = isDestructive ? AppTheme.dangerRed : AppTheme.textPrimary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (isDestructive ? AppTheme.dangerRed : AppTheme.forestGreen).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-              ),
-              if (!isDestructive)
-                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
-            ],
-          ),
-        ),
       ),
     );
   }

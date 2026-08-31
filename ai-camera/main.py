@@ -102,12 +102,12 @@ def auto_detect_loop():
                             f"({det.confidence:.1%} conf) [{det.verification_status}]"
                         )
 
-                        # Send notification immediately with 0.8s debounce per animal type
-                        if now - last_sent >= 0.8:
+                        # Send notification immediately with 0.2s debounce for near-instant dispatching
+                        if now - last_sent >= 0.2:
                             last_sent_timestamps[det.animal_type] = now
                             payload = det.to_payload()
 
-                            # Dispatch to backend
+                            # Dispatch to backend immediately
                             res = api_client.send_detection(payload)
                             if res:
                                 yolo.record_alert_dispatched()

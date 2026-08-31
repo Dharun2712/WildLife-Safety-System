@@ -7,10 +7,6 @@ class AppConstants {
   static const String wsBaseUrl =
       'wss://wildlife-safety-system.onrender.com/ws';
 
-  // For Android Emulator localhost fallback:
-  // static const String apiBaseUrl = 'http://10.0.2.2:8000';
-  // static const String wsBaseUrl = 'ws://10.0.2.2:8000/ws';
-
   // App Info
   static const String appName = 'ForestGuard';
   static const String appVersion = '1.0.0';
@@ -22,8 +18,8 @@ class AppConstants {
   static const double defaultZoom = 13.0;
 
   // WebSocket
-  static const int wsReconnectBaseDelayMs = 1000;
-  static const int wsReconnectMaxDelayMs = 30000;
+  static const int wsReconnectBaseDelayMs = 500;
+  static const int wsReconnectMaxDelayMs = 5000;
 
   // Safety labels
   static const Map<String, String> safetyMessages = {
@@ -34,7 +30,7 @@ class AppConstants {
         'Remain at a safe location and follow official ranger instructions.',
   };
 
-  // Animal info
+  // Animal info (No emojis, simple clean names: tiger, elephant, lion, leopard, bear)
   static const Map<String, String> animalEmojis = {
     'tiger': '',
     'elephant': '',
