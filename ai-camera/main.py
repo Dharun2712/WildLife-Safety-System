@@ -151,6 +151,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("⚠️ [BACKEND UNAVAILABLE - RETRYING] Render backend not reachable yet - events logged locally")
 
+    # Auto-initialize camera capture stream
+    camera.start()
+
     # Launch background continuous workers
     threading.Thread(target=heartbeat_loop, daemon=True).start()
     threading.Thread(target=auto_detect_loop, daemon=True).start()

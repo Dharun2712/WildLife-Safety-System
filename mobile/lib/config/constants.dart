@@ -36,11 +36,11 @@ class AppConstants {
 
   // Animal info
   static const Map<String, String> animalEmojis = {
-    'tiger': '🐯',
-    'elephant': '🐘',
-    'lion': '🦁',
-    'leopard': '🐆',
-    'bear': '🐻',
+    'tiger': '',
+    'elephant': '',
+    'lion': '',
+    'leopard': '',
+    'bear': '',
   };
 
   static const Map<String, String> animalNames = {

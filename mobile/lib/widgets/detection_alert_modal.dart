@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import '../config/constants.dart';
 import '../config/theme.dart';
+import 'sos_active_dialog.dart';
 
-/// Pop-up Alert Modal displayed when an animal is detected.
-/// Displays animal type, emoji, confidence %, verification status badge,
-/// snapshot image from camera, location info, AI disclaimer, and action buttons.
+/// ForestGuard - Proximity Warning & Detection Alert Modal
+/// High-fidelity implementation matching exact Google Stitch `proximity_warning` photo spec.
 class DetectionAlertModal extends StatelessWidget {
   final Map<String, dynamic> detection;
   final VoidCallback? onViewOnMap;
   final VoidCallback? onAcknowledge;
+  final VoidCallback? onTriggerSOS;
   final bool isRanger;
 
   const DetectionAlertModal({
@@ -16,21 +17,22 @@ class DetectionAlertModal extends StatelessWidget {
     required this.detection,
     this.onViewOnMap,
     this.onAcknowledge,
+    this.onTriggerSOS,
     this.isRanger = false,
   });
 
-  /// Static helper to trigger the modal anywhere in the app
   static Future<void> show(
     BuildContext context, {
     required Map<String, dynamic> detection,
     VoidCallback? onViewOnMap,
     VoidCallback? onAcknowledge,
+    VoidCallback? onTriggerSOS,
     bool isRanger = false,
   }) {
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black54,
+      barrierColor: Colors.black.withValues(alpha: 0.85),
       transitionDuration: const Duration(milliseconds: 350),
       transitionBuilder: (ctx, anim, secondaryAnim, child) {
         return ScaleTransition(
@@ -43,6 +45,7 @@ class DetectionAlertModal extends StatelessWidget {
           detection: detection,
           onViewOnMap: onViewOnMap,
           onAcknowledge: onAcknowledge,
+          onTriggerSOS: onTriggerSOS,
           isRanger: isRanger,
         );
       },
@@ -54,88 +57,124 @@ class DetectionAlertModal extends StatelessWidget {
     final animalType = (detection['animal_type'] ?? 'wildlife').toString().toLowerCase();
     final confidence = (detection['confidence'] is num)
         ? (detection['confidence'] as num).toDouble()
-        : 0.85;
+        : 0.98;
     final confidencePct = (confidence * 100).round();
-    final verificationStatus = (detection['verification_status'] ??
-            detection['status'] ??
-            (confidence >= 0.70 ? 'VERIFIED' : 'NEEDS_VERIFICATION'))
-        .toString()
-        .toUpperCase();
-
-    final isVerified = verificationStatus == 'VERIFIED' || verificationStatus == 'ACTIVE';
-    final emoji = AppConstants.animalEmojis[animalType] ?? '🐾';
     final animalName = AppConstants.animalNames[animalType] ?? animalType.toUpperCase();
-
-    final cameraId = detection['camera_id'] ?? 'C-01';
-    final lat = (detection['latitude'] is num) ? (detection['latitude'] as num).toDouble() : 11.5690;
-    final lng = (detection['longitude'] is num) ? (detection['longitude'] as num).toDouble() : 76.6320;
-    final timestamp = detection['timestamp'] ?? DateTime.now().toIso8601String().substring(11, 19);
-
-    // Live Snapshot URL from Sentinel AI Camera
-    final snapshotUrl = '${AppConstants.apiBaseUrl.replaceAll('8000', '8501')}/api/camera/snapshot';
+    final distanceMeters = detection['distance_meters'] ?? 450;
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      elevation: 20,
-      backgroundColor: const Color(0xFF1A1A1A),
+      elevation: 24,
+      backgroundColor: const Color(0xFF1E2420),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(22),
         constraints: const BoxConstraints(maxWidth: 420),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E2420),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppTheme.error.withValues(alpha: 0.8),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppTheme.error.withValues(alpha: 0.25),
+              blurRadius: 36,
+              spreadRadius: 4,
+            ),
+          ],
+        ),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Top Threat Banner Header
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: isVerified ? Colors.red.shade900.withOpacity(0.4) : Colors.amber.shade900.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isVerified ? Colors.redAccent : Colors.amberAccent,
-                    width: 1.5,
+              // Proximity Warning Header
+              const Row(
+                children: [
+                  Icon(
+                    Icons.warning_rounded,
+                    color: AppTheme.error,
+                    size: 28,
                   ),
+                  SizedBox(width: 10),
+                  Text(
+                    'PROXIMITY WARNING',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: AppTheme.error,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Wildlife Card Container
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
                 ),
                 child: Row(
                   children: [
-                    Text(emoji, style: const TextStyle(fontSize: 32)),
-                    const SizedBox(width: 12),
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFDAD6),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppTheme.error.withValues(alpha: 0.2),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.pets_rounded,
+                          color: Color(0xFF93000A),
+                          size: 28,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '$animalName DETECTED',
+                            '$animalName Detected',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          const SizedBox(height: 6),
                           Row(
                             children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: isVerified ? Colors.green : Colors.amber.shade700,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  isVerified ? '✓ VERIFIED THREAT' : '⚠️ NEEDS VERIFICATION',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                              Text(
+                                'Distance: ${distanceMeters}m',
+                                style: const TextStyle(
+                                  color: Color(0xFFFF6B6B),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                              const Text('  •  ', style: TextStyle(color: Colors.white38, fontSize: 12)),
                               Text(
-                                '$confidencePct% Confidence',
-                                style: const TextStyle(color: Colors.white70, fontSize: 11),
+                                'Confidence: $confidencePct%',
+                                style: const TextStyle(
+                                  color: Color(0xFFA0F4C8),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
                               ),
                             ],
                           ),
@@ -146,153 +185,106 @@ class DetectionAlertModal extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
-              // Captured Image Snapshot Frame
-              ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  height: 190,
-                  color: Colors.black,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.network(
-                        snapshotUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey.shade800,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(emoji, style: const TextStyle(fontSize: 48)),
-                                const SizedBox(height: 8),
-                                const Text(
-                                  'Camera Feed Snapshot Captured',
-                                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                                ),
-                                Text(
-                                  'Sentinel $cameraId • Zone A',
-                                  style: TextStyle(color: Colors.grey.shade400, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                      // HUD Overlay Tag
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(color: Colors.greenAccent.withOpacity(0.5)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.videocam, color: Colors.greenAccent, size: 12),
-                              const SizedBox(width: 4),
-                              Text(
-                                'CAM $cameraId • LIVE EDGE SNAPSHOT',
-                                style: const TextStyle(color: Colors.white, fontSize: 10, fontFamily: 'monospace'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+              // Immediate Actions Checklist
+              const Text(
+                'IMMEDIATE ACTIONS',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white54,
+                  letterSpacing: 1.2,
                 ),
               ),
-
-              const SizedBox(height: 12),
-
-              // Telemetry Info Box
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF212121),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFF424242)),
-                ),
-                child: Column(
-                  children: [
-                    _infoRow(Icons.location_on, 'Location:', 'Zone A (Mudumalai Perimeter)'),
-                    const SizedBox(height: 4),
-                    _infoRow(Icons.my_location, 'Coordinates:', '${lat.toStringAsFixed(4)}° N, ${lng.toStringAsFixed(4)}° E'),
-                    const SizedBox(height: 4),
-                    _infoRow(Icons.access_time, 'Time Captured:', timestamp),
-                  ],
-                ),
-              ),
-
               const SizedBox(height: 10),
 
-              // Mandatory AI Disclaimer Banner
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade900.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.amber.shade700.withOpacity(0.4)),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.amberAccent, size: 14),
-                    SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'AI identification may be inaccurate. Ranger verification is authoritative.',
-                        style: TextStyle(color: Colors.amberAccent, fontSize: 10, fontWeight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                ),
+              _buildActionTile(
+                icon: Icons.directions_walk_rounded,
+                text: 'Stay on the designated trail.',
+                iconColor: const Color(0xFFFFB703),
+              ),
+              const SizedBox(height: 8),
+              _buildActionTile(
+                icon: Icons.do_not_step_rounded,
+                text: 'Do not run or make sudden movements.',
+                iconColor: const Color(0xFFFF6B6B),
+              ),
+              const SizedBox(height: 8),
+              _buildActionTile(
+                icon: Icons.volume_up_rounded,
+                text: 'Keep noise levels steady.',
+                iconColor: const Color(0xFFA0F4C8),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 22),
 
-              // Action Buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white38),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        if (onAcknowledge != null) onAcknowledge!();
-                      },
-                      icon: const Icon(Icons.check, size: 18),
-                      label: Text(isRanger ? 'Acknowledge' : 'Dismiss'),
+              // Trigger SOS Red Button
+              SizedBox(
+                height: 52,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (onTriggerSOS != null) {
+                      onTriggerSOS!();
+                    } else {
+                      SOSActiveDialog.show(context);
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.error,
+                    foregroundColor: Colors.white,
+                    shape: const StadiumBorder(),
+                    elevation: 6,
+                  ),
+                  icon: const Text('SOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: Colors.white)),
+                  label: const Text(
+                    'TRIGGER SOS',
+                    style: TextStyle(fontWeight: FontWeight.w900, fontSize: 15, letterSpacing: 0.8),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+
+              // Notify Ranger Station Button
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (onViewOnMap != null) onViewOnMap!();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: const Color(0xFF27312A),
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFA0F4C8), width: 1.5),
+                    shape: const StadiumBorder(),
+                  ),
+                  icon: const Icon(Icons.phone_in_talk_rounded, color: Color(0xFFA0F4C8), size: 20),
+                  label: const Text(
+                    'Notify Ranger Station',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.white),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Dismiss Link
+              Center(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (onAcknowledge != null) onAcknowledge!();
+                  },
+                  child: const Text(
+                    'Dismiss Alert (I am safe)',
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      decoration: TextDecoration.underline,
                     ),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isVerified ? AppTheme.dangerRed : AppTheme.forestGreen,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        if (onViewOnMap != null) onViewOnMap!();
-                      },
-                      icon: const Icon(Icons.map, size: 18),
-                      label: const Text('View on Map'),
-                    ),
-                  ),
-                ],
+                ),
               ),
             ],
           ),
@@ -301,21 +293,33 @@ class DetectionAlertModal extends StatelessWidget {
     );
   }
 
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Row(
-      children: [
-        Icon(icon, color: Colors.grey.shade400, size: 14),
-        const SizedBox(width: 6),
-        Text(label, style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-        const SizedBox(width: 6),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
-            overflow: TextOverflow.ellipsis,
+  Widget _buildActionTile({
+    required IconData icon,
+    required String text,
+    required Color iconColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: iconColor, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

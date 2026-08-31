@@ -7,6 +7,7 @@ import '../../providers/providers.dart';
 import '../../config/constants.dart';
 import '../../widgets/forest_map_view.dart';
 import '../../widgets/detection_alert_modal.dart';
+import 'emergency_help_screen.dart';
 
 class TouristShell extends ConsumerStatefulWidget {
   const TouristShell({super.key});
@@ -112,277 +113,475 @@ class _TouristShellState extends ConsumerState<TouristShell> {
 // ═══════════════════════════════════════════════════
 // TOURIST HOME TAB — Premium Dashboard
 // ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+// TOURIST HOME TAB — Premium Dashboard (Images 3, 4, 5)
+// ═══════════════════════════════════════════════════
 class _TouristHomeTab extends ConsumerWidget {
   final AuthState auth;
   const _TouristHomeTab({required this.auth});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final userName = auth.user?['full_name'] ?? 'Alex';
     final safetyAsync = ref.watch(safetyStatusProvider);
     final alertsAsync = ref.watch(alertsProvider);
-    final zonesAsync = ref.watch(dangerZonesProvider);
 
     return Scaffold(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: CircleAvatar(
+            backgroundColor: AppTheme.surfaceContainerHigh,
+            backgroundImage: const NetworkImage('https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80'),
+          ),
+        ),
+        title: const Text(
+          'ForestGuard',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.primary),
+        ),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: AppTheme.primary),
+            onPressed: () {},
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {},
+        backgroundColor: const Color(0xFFBA1A1A),
+        foregroundColor: Colors.white,
+        elevation: 6,
+        icon: const Icon(Icons.sos_rounded, size: 22),
+        label: const Text('SOS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(safetyStatusProvider);
           ref.invalidate(alertsProvider);
-          ref.invalidate(dangerZonesProvider);
         },
-        child: CustomScrollView(
-          slivers: [
-            // Premium gradient app bar with hero welcome
-            SliverAppBar(
-              expandedHeight: 180,
-              pinned: true,
-              backgroundColor: AppTheme.forestGreen,
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppTheme.forestGradient,
-                  ),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 48, 20, 16),
-                      child: Column(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            // Greeting & Park Dropdown Selector (Image 4 & Image 5)
+            Text(
+              'Good Morning,\n$userName.',
+              style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppTheme.primary, height: 1.1, letterSpacing: -0.5),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Ready for your trail walk.',
+              style: TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 14),
+
+            // Dropdown Park Selector Card (Image 4 & Image 5)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 14,
+                        backgroundImage: NetworkImage('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=400&q=80'),
+                      ),
+                      SizedBox(width: 10),
+                      Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 48,
-                                height: 48,
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(14),
-                                  color: Colors.white.withValues(alpha: 0.15),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    (auth.user?['full_name'] ?? 'T').substring(0, 1).toUpperCase(),
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Hello, ${auth.user?['full_name'] ?? 'Tourist'} 👋',
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Stay informed, stay safe',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.white.withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                          Text('Current Zone', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant)),
+                          Text('Redwoods National Park', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
                         ],
                       ),
+                    ],
+                  ),
+                  Icon(Icons.arrow_drop_down, color: AppTheme.primary),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Hero Safety Banner (Image 4 Safe state vs Image 5 Danger state)
+            safetyAsync.when(
+              data: (status) {
+                final isDanger = status['status'] == 'danger' || status['status'] == 'approaching';
+                return isDanger ? _buildDangerHeroCard() : _buildSafeHeroCard();
+              },
+              loading: () => _buildSafeHeroCard(),
+              error: (_, __) => _buildSafeHeroCard(),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Weather & Trail Status Row (Image 3)
+            Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: AppTheme.ambientShadow,
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Icon(Icons.wb_sunny_outlined, color: AppTheme.onSurfaceVariant, size: 20),
+                            Text('North Sector', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant)),
+                          ],
+                        ),
+                        SizedBox(height: 8),
+                        Text('72°F', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppTheme.primary)),
+                        SizedBox(height: 2),
+                        Text('Moderate UV Index', style: TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
+                      ],
                     ),
                   ),
                 ),
-              ),
-              title: const Text('ForestGuard'),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: AppTheme.ambientShadow,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Icon(Icons.hiking_rounded, color: AppTheme.onSurfaceVariant, size: 20),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE5F7ED),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Text('• Open', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.secondary)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('Trails Dry', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                        const SizedBox(height: 2),
+                        const Text('Good visibility today.', style: TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
 
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Safety Status Card with glow
-                  safetyAsync.when(
-                    data: (status) => _PremiumSafetyCard(status: status),
-                    loading: () => const SizedBox(
-                      height: 120,
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
-                    error: (_, __) => _PremiumSafetyCard(
-                      status: {'status': 'safe', 'message': AppConstants.safetyMessages['safe']!},
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-                  // Active Alerts Section
-                  _sectionHeader('Active Alerts', Icons.warning_amber_rounded),
-                  const SizedBox(height: 10),
-                  alertsAsync.when(
-                    data: (alerts) {
-                      final active = alerts.where((a) =>
-                          a['status'] != 'closed' && a['status'] != 'rejected').toList();
-                      if (active.isEmpty) {
-                        return _EmptyStateCard(
-                          icon: Icons.check_circle_outline_rounded,
-                          color: AppTheme.safeGreen,
-                          title: 'No Active Alerts',
-                          subtitle: 'All clear — enjoy your visit',
-                        );
-                      }
-                      return Column(
-                        children: active.take(3).map((a) => _PremiumAlertCard(alert: a)).toList(),
-                      );
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (_, __) => _EmptyStateCard(
-                      icon: Icons.cloud_off_rounded,
-                      color: Colors.grey,
-                      title: 'Unable to load alerts',
-                      subtitle: 'Pull down to refresh',
+            // Trail Traffic Banner Card (Image 4)
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Stack(
+                    children: [
+                      Image.network(
+                        'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80',
+                        height: 120,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                      Positioned(
+                        bottom: 8,
+                        left: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.6),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.location_on_outlined, color: Colors.white, size: 12),
+                              SizedBox(width: 4),
+                              Text('Current: Northern Ridge Trail', style: TextStyle(color: Colors.white, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Trail Traffic', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                        SizedBox(height: 2),
+                        Text('Light activity expected.', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Danger Zones
-                  _sectionHeader('Active Danger Zones', Icons.radar_rounded),
-                  const SizedBox(height: 10),
-                  zonesAsync.when(
-                    data: (zones) {
-                      if (zones.isEmpty) {
-                        return _EmptyStateCard(
-                          icon: Icons.landscape_rounded,
-                          color: AppTheme.safeGreen,
-                          title: 'No Active Danger Zones',
-                          subtitle: 'The forest area is currently safe',
-                        );
-                      }
-                      return Column(
-                        children: zones.map((z) => _PremiumDangerZoneCard(zone: z)).toList(),
-                      );
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (_, __) => const SizedBox(),
-                  ),
-                  const SizedBox(height: 16),
-                ]),
+                ],
               ),
             ),
+
+            const SizedBox(height: 24),
+
+            // Nearby Activity Header & Horizontal Cards (Image 3 & 4)
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Nearby Activity', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+                Text('Expand Map >', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.secondary)),
+              ],
+            ),
+            const SizedBox(height: 12),
+
+            SizedBox(
+              height: 100,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                children: [
+                  _buildActivityCard('Mule Deer', '0.4 mi • West Trail', '15m ago', Icons.pets_rounded, const Color(0xFFE5F7ED), AppTheme.secondary),
+                  const SizedBox(width: 12),
+                  _buildActivityCard('Black Bear', '1.2 mi • Ridge Path', '30m ago', Icons.pets_rounded, const Color(0xFFFFDAD6), const Color(0xFFBA1A1A)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Safety Reminders List (Image 4)
+            const Text('Safety Reminders', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+            const SizedBox(height: 12),
+
+            Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppTheme.ambientShadow,
+              ),
+              child: Column(
+                children: [
+                  _buildReminderTile(Icons.wb_sunny_outlined, 'Weather Advisory', 'Temperatures dropping after 4 PM.'),
+                  const Divider(height: 1, indent: 60),
+                  _buildReminderTile(Icons.water_drop_outlined, 'Hydration Station', 'Next refill point is 2 miles ahead on path.'),
+                  const Divider(height: 1, indent: 60),
+                  _buildReminderTile(Icons.groups_outlined, 'Stay Together', 'Keep groups tight in dense foliage.'),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 40),
           ],
         ),
       ),
     );
   }
 
-  Widget _sectionHeader(String title, IconData icon) {
-    return Row(
-      children: [
-        Icon(icon, size: 20, color: AppTheme.forestGreen),
-        const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-        ),
-      ],
-    );
-  }
-}
-
-// Premium safety card with glow border
-class _PremiumSafetyCard extends StatelessWidget {
-  final Map<String, dynamic> status;
-  const _PremiumSafetyCard({required this.status});
-
-  @override
-  Widget build(BuildContext context) {
-    final s = (status['status'] as String?) ?? 'safe';
-    final color = AppTheme.getStatusColor(s);
-    final message = status['message'] ?? AppConstants.safetyMessages[s] ?? '';
-
+  // Hero Mint Safe Card (Image 4)
+  Widget _buildSafeHeroCard() {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.25), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-          ...AppTheme.elevatedShadow,
-        ],
+        color: const Color(0xFFA0F4C8),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: AppTheme.ambientShadow,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  gradient: AppTheme.getStatusGradient(s),
-                  borderRadius: BorderRadius.circular(20),
+                  color: Colors.white.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+                child: const Row(
                   children: [
-                    Icon(
-                      s == 'safe' ? Icons.check_circle_rounded
-                          : s == 'approaching' ? Icons.warning_rounded
-                          : Icons.dangerous_rounded,
-                      color: Colors.white,
-                      size: 14,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      s.toUpperCase(),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
+                    Icon(Icons.circle, color: AppTheme.secondary, size: 8),
+                    SizedBox(width: 6),
+                    Text('LIVE STATUS', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: 0.5)),
                   ],
                 ),
               ),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  s == 'safe' ? Icons.shield_rounded
-                      : s == 'approaching' ? Icons.shield_moon_rounded
-                      : Icons.gpp_bad_rounded,
-                  color: color,
-                  size: 24,
+              const Icon(Icons.shield_outlined, color: AppTheme.primary, size: 28),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Row(
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: AppTheme.primary,
+                child: Icon(Icons.shield_rounded, color: Colors.white, size: 16),
+              ),
+              SizedBox(width: 10),
+              Text(
+                'YOU ARE SAFE',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: AppTheme.primary, letterSpacing: -0.5),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'No active wildlife safety alerts near your current location. Trail conditions are clear.',
+            style: TextStyle(fontSize: 13, color: AppTheme.primary, height: 1.4),
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: Colors.white,
+                shape: const StadiumBorder(),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.map_outlined, size: 16),
+              label: const Text('View Forest Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Hero Red Danger Zone Card (Image 5)
+  Widget _buildDangerHeroCard() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: const Color(0xFFBA1A1A),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 14),
+                SizedBox(width: 6),
+                Text('ACTIVE WILDLIFE SAFETY ZONE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: 0.5)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Your current location is within an active wildlife safety zone.',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white, height: 1.2),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(width: 3, height: 32, color: Colors.white70),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Remain at a safe location and follow official ranger instructions.',
+                  style: TextStyle(fontSize: 12, color: Colors.white70, height: 1.3),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Text(
-            'Safety Status',
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textSecondary),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            message as String,
-            style: const TextStyle(fontSize: 14, height: 1.5),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 44,
+            child: ElevatedButton.icon(
+              onPressed: () {},
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: const Color(0xFFBA1A1A),
+                shape: const StadiumBorder(),
+                elevation: 0,
+              ),
+              icon: const Icon(Icons.map_outlined, size: 16, color: Color(0xFFBA1A1A)),
+              label: const Text('View Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFBA1A1A))),
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildActivityCard(String title, String subtitle, String time, IconData icon, Color bg, Color iconColor) {
+    return Container(
+      width: 200,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppTheme.ambientShadow,
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+            child: Icon(icon, color: iconColor, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppTheme.primary), overflow: TextOverflow.ellipsis),
+                const SizedBox(height: 2),
+                Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant), overflow: TextOverflow.ellipsis),
+                Text(time, style: const TextStyle(fontSize: 10, color: AppTheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReminderTile(IconData icon, String title, String subtitle) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(color: AppTheme.surfaceContainerHigh, shape: BoxShape.circle),
+        child: Icon(icon, color: AppTheme.primary, size: 18),
+      ),
+      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.primary)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 11, color: AppTheme.onSurfaceVariant)),
     );
   }
 }
@@ -690,306 +889,28 @@ class _TouristMapTab extends ConsumerWidget {
 }
 
 // ═══════════════════════════════════════════════════
-// TOURIST ALERTS TAB
+// TOURIST ALERTS TAB (Matching Image 1: Approaching Wildlife Alert View)
 // ═══════════════════════════════════════════════════
-class _TouristAlertsTab extends ConsumerWidget {
+class _TouristAlertsTab extends StatelessWidget {
   const _TouristAlertsTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final alertsAsync = ref.watch(alertsProvider);
-    final notifAsync = ref.watch(notificationsProvider);
-
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Alerts & Notifications'),
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white60,
-            indicatorColor: Colors.white,
-            indicatorWeight: 3,
-            tabs: [Tab(text: 'Alerts'), Tab(text: 'Notifications')],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            // Alerts tab
-            alertsAsync.when(
-              data: (alerts) {
-                if (alerts.isEmpty) {
-                  return Center(child: _EmptyStateCard(
-                    icon: Icons.notifications_none_rounded,
-                    color: Colors.grey,
-                    title: 'No alerts',
-                    subtitle: 'You\'re all caught up',
-                  ));
-                }
-                return RefreshIndicator(
-                  onRefresh: () async => ref.invalidate(alertsProvider),
-                  child: ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: alerts.length,
-                    itemBuilder: (_, i) => _PremiumAlertCard(alert: alerts[i]),
-                  ),
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Center(child: Text('Unable to load alerts')),
-            ),
-            // Notifications tab
-            notifAsync.when(
-              data: (notifs) {
-                if (notifs.isEmpty) {
-                  return Center(child: _EmptyStateCard(
-                    icon: Icons.inbox_rounded,
-                    color: Colors.grey,
-                    title: 'No notifications',
-                    subtitle: 'Notifications will appear here',
-                  ));
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: notifs.length,
-                  itemBuilder: (_, i) {
-                    final n = notifs[i];
-                    final isWarning = n['type'] == 'wildlife_warning';
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: AppTheme.elevatedShadow,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 4,
-                              decoration: BoxDecoration(
-                                color: isWarning ? AppTheme.dangerRed : AppTheme.infoBlue,
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(16),
-                                  bottomLeft: Radius.circular(16),
-                                ),
-                              ),
-                            ),
-                            Expanded(
-                              child: ListTile(
-                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: (isWarning ? AppTheme.dangerRed : AppTheme.infoBlue).withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Icon(
-                                    isWarning ? Icons.warning_rounded : Icons.info_rounded,
-                                    color: isWarning ? AppTheme.dangerRed : AppTheme.infoBlue,
-                                    size: 20,
-                                  ),
-                                ),
-                                title: Text(n['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                                subtitle: Text(
-                                  n['message'] ?? '',
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                ),
-                                trailing: n['is_read'] == true ? null : Container(
-                                  width: 10, height: 10,
-                                  decoration: BoxDecoration(
-                                    gradient: AppTheme.dangerGradient,
-                                    shape: BoxShape.circle,
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: AppTheme.dangerRed.withValues(alpha: 0.3),
-                                        blurRadius: 6,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (_, __) => const Center(child: Text('Unable to load notifications')),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget build(BuildContext context) {
+    return const EmergencyHelpScreen(isApproachingView: true);
   }
 }
 
 // ═══════════════════════════════════════════════════
-// TOURIST SAFETY TAB
+// TOURIST SAFETY TAB (Matching Image 5: Emergency Help & Safety Protocols)
 // ═══════════════════════════════════════════════════
 class _TouristSafetyTab extends StatelessWidget {
   const _TouristSafetyTab();
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Safety Center')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Safety Guidelines
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: AppTheme.elevatedShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.forestGreen.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.shield_rounded, color: AppTheme.forestGreen, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text('Safety Guidelines', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                ]),
-                const SizedBox(height: 16),
-                _safetyTip('Keep a safe distance from all wildlife'),
-                _safetyTip('Follow ranger instructions immediately'),
-                _safetyTip('Stay on designated paths and zones'),
-                _safetyTip('Do not feed or provoke animals'),
-                _safetyTip('Keep your GPS enabled for safety alerts'),
-                _safetyTip('Report any wildlife sighting to rangers'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Status Guide
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: AppTheme.elevatedShadow,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppTheme.infoBlue.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.info_rounded, color: AppTheme.infoBlue, size: 20),
-                  ),
-                  const SizedBox(width: 10),
-                  const Text('Safety Status Guide', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                ]),
-                const SizedBox(height: 16),
-                _statusInfo('SAFE', AppTheme.safeGreen, 'No active wildlife alert near you'),
-                _statusInfo('APPROACHING', AppTheme.approachingAmber, 'You are nearing an active safety zone'),
-                _statusInfo('INSIDE', AppTheme.dangerRed, 'You are within an active safety zone'),
-              ],
-            ),
-          ),
-          const SizedBox(height: 14),
-
-          // Disclaimer
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppTheme.approachingAmber.withValues(alpha: 0.06),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppTheme.approachingAmber.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppTheme.approachingAmber.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.warning_amber_rounded, color: AppTheme.approachingAmber, size: 18),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Safety radii are operational demo parameters and not scientific or guaranteed safety measures.',
-                    style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _safetyTip(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.only(top: 2),
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: AppTheme.safeGreen.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: const Icon(Icons.check_rounded, color: AppTheme.safeGreen, size: 14),
-          ),
-          const SizedBox(width: 10),
-          Expanded(child: Text(text, style: const TextStyle(fontSize: 14, height: 1.3))),
-        ],
-      ),
-    );
-  }
-
-  Widget _statusInfo(String label, Color color, String desc) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [color, color.withValues(alpha: 0.7)],
-              ),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              label,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10, letterSpacing: 0.5),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(child: Text(desc, style: const TextStyle(fontSize: 13, height: 1.3))),
-        ],
-      ),
-    );
+    return const EmergencyHelpScreen(isApproachingView: false);
   }
 }
-
 // ═══════════════════════════════════════════════════
 // TOURIST PROFILE TAB
 // ═══════════════════════════════════════════════════

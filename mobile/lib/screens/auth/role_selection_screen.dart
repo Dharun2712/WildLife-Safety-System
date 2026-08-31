@@ -34,7 +34,7 @@ class RoleSelectionScreen extends StatelessWidget {
                     boxShadow: AppTheme.glowShadow(AppTheme.safeGreen, intensity: 0.2),
                   ),
                   child: const Center(
-                    child: Text('🌲', style: TextStyle(fontSize: 28)),
+                    child: Icon(Icons.forest_rounded, color: Colors.white, size: 30),
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -77,7 +77,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
                 // Tourist Card
                 _PremiumRoleCard(
-                  icon: '🏕️',
+                  iconData: Icons.explore_rounded,
                   title: 'Tourist',
                   description: 'View safety zones, receive wildlife alerts, and stay protected during your forest visit.',
                   gradient: AppTheme.emeraldGlow,
@@ -88,7 +88,7 @@ class RoleSelectionScreen extends StatelessWidget {
 
                 // Ranger Card
                 _PremiumRoleCard(
-                  icon: '🛡️',
+                  iconData: Icons.security_rounded,
                   title: 'Ranger',
                   description: 'Monitor wildlife detections, manage alerts, and coordinate tourist safety operations.',
                   gradient: AppTheme.rangerGradient,
@@ -120,7 +120,7 @@ class RoleSelectionScreen extends StatelessWidget {
 }
 
 class _PremiumRoleCard extends StatefulWidget {
-  final String icon;
+  final IconData iconData;
   final String title;
   final String description;
   final LinearGradient gradient;
@@ -128,7 +128,7 @@ class _PremiumRoleCard extends StatefulWidget {
   final VoidCallback onTap;
 
   const _PremiumRoleCard({
-    required this.icon,
+    required this.iconData,
     required this.title,
     required this.description,
     required this.gradient,
@@ -218,7 +218,7 @@ class _PremiumRoleCardState extends State<_PremiumRoleCard>
                   ),
                 ),
                 child: Center(
-                  child: Text(widget.icon, style: const TextStyle(fontSize: 30)),
+                  child: Icon(widget.iconData, color: Colors.white, size: 30),
                 ),
               ),
               const SizedBox(width: 16),

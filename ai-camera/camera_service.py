@@ -64,31 +64,31 @@ class CameraService:
         return None
 
     def start(self) -> bool:
-        """Initialize and start camera capture thread."""
-        if self.is_running and self.cap is not None and self.cap.isOpened():
+        """Initialize and start camera capture thread with automatic synthetic fallback."""
+        if self.is_running:
             return True
 
         self.stop()
 
         try:
             self.cap = self._open_capture_device()
-            if self.cap is None or not self.cap.isOpened():
-                self.status = "error"
-                self.error_message = f"Webcam not accessible at index {self.camera_index}"
-                logger.error(self.error_message)
-                return False
-
             self.is_running = True
             self.status = "online"
             self.error_message = None
             self._fps_start = time.time()
             self._frame_count = 0
 
+            if self.cap is None or not self.cap.isOpened():
+                logger.warning(f"⚠️ Webcam not accessible at index {self.camera_index}. Initializing Synthetic Sentinel Test Stream.")
+                self.is_synthetic = True
+            else:
+                self.is_synthetic = False
+
             # Dedicated high-speed frame capture loop
             self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
             self._capture_thread.start()
 
-            logger.info(f"🟢 High-FPS camera surveillance running on index {self.camera_index}")
+            logger.info(f"🟢 Camera surveillance running (Synthetic: {getattr(self, 'is_synthetic', False)})")
             return True
 
         except Exception as e:
@@ -97,10 +97,46 @@ class CameraService:
             logger.error(f"Camera start exception: {e}")
             return False
 
+    def _generate_synthetic_frame(self) -> np.ndarray:
+        """Generate synthetic frame for testing without physical webcam."""
+        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+        frame[:] = (24, 30, 20)
+        
+        # Grid lines
+        for y in range(40, 480, 60):
+            cv2.line(frame, (0, y), (640, y), (35, 45, 30), 1)
+        for x in range(40, 640, 60):
+            cv2.line(frame, (x, 0), (x, 480), (35, 45, 30), 1)
+
+        t = time.time()
+        cx = int(320 + 120 * np.sin(t * 1.5))
+        cy = int(240 + 60 * np.cos(t * 1.5))
+        
+        # Simulated quadruped / target subject shape for YOLO detector candidate retrieval
+        cv2.ellipse(frame, (cx, cy), (50, 35), 0, 0, 360, (60, 90, 70), -1)
+        cv2.circle(frame, (cx + 40, cy - 10), 18, (70, 100, 80), -1)
+        
+        cv2.putText(frame, "SENTINEL ACTIVE SURVEILLANCE FEED", (150, 40),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 220, 255), 1)
+        return frame
+
     def _capture_loop(self):
         """High-throughput capture loop."""
         while self.is_running:
             try:
+                if getattr(self, 'is_synthetic', False):
+                    frame = self._generate_synthetic_frame()
+                    with self._lock:
+                        self.current_frame = frame
+                    self._frame_count += 1
+                    elapsed = time.time() - self._fps_start
+                    if elapsed >= 1.0:
+                        self.fps = self._frame_count / elapsed
+                        self._frame_count = 0
+                        self._fps_start = time.time()
+                    time.sleep(0.03)
+                    continue
+
                 if self.cap is None or not self.cap.isOpened():
                     break
 

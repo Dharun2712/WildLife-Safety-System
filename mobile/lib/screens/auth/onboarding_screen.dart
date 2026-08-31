@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
 
+/// ForestGuard - Onboarding Feature Slides (Image 4: Know What's Nearby)
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -9,267 +10,236 @@ class OnboardingScreen extends StatefulWidget {
   State<OnboardingScreen> createState() => _OnboardingScreenState();
 }
 
-class _OnboardingScreenState extends State<OnboardingScreen>
-    with TickerProviderStateMixin {
-  final _controller = PageController();
+class _OnboardingScreenState extends State<OnboardingScreen> {
+  final PageController _controller = PageController();
   int _currentPage = 0;
-  late AnimationController _bgAnimController;
 
-  final _pages = [
+  final List<Map<String, dynamic>> _slides = [
     {
-      'icon': '🐾',
-      'title': 'AI Wildlife Detection',
-      'desc': 'AI-powered cameras detect wildlife in real-time, keeping you informed about nearby animal activity.',
-      'gradient': const [Color(0xFF0D2B0F), Color(0xFF1B5E20)],
-      'accentColor': AppTheme.safeGreen,
+      'title': 'Know What\'s Nearby',
+      'desc': 'Stay aware of local wildlife activity. We map safe routes and highlight areas to approach with caution.',
+      'badge': 'Deer Activity',
+      'icon': Icons.explore_outlined,
+      'image': 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=600&q=80',
     },
     {
-      'icon': '🚨',
-      'title': 'Real-time Safety Alerts',
-      'desc': 'Receive instant notifications when you\'re near an active wildlife zone. Stay alert, stay safe.',
-      'gradient': const [Color(0xFF1A0A00), Color(0xFFBF360C)],
-      'accentColor': AppTheme.approachingAmber,
+      'title': 'Real-Time Safety Alerts',
+      'desc': 'Receive instant push notifications when danger is detected near your current location.',
+      'badge': 'Tiger Alert',
+      'icon': Icons.warning_amber_rounded,
+      'image': 'https://images.unsplash.com/photo-1561731216-c3a4d99437d5?auto=format&fit=crop&w=600&q=80',
     },
     {
-      'icon': '🛡️',
-      'title': 'Ranger Protection',
-      'desc': 'Professional forest rangers verify AI alerts and manage safety zones to keep you protected.',
-      'gradient': const [Color(0xFF0A1929), Color(0xFF1565C0)],
-      'accentColor': AppTheme.infoBlue,
+      'title': 'Ranger Support & Emergency SOS',
+      'desc': 'Direct connection to patrol units and one-tap emergency SOS broadcast in danger zones.',
+      'badge': 'Ranger Active',
+      'icon': Icons.security_rounded,
+      'image': 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=600&q=80',
     },
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _bgAnimController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 600),
-    );
-  }
-
-  @override
   void dispose() {
     _controller.dispose();
-    _bgAnimController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final gradientColors = (_pages[_currentPage]['gradient'] as List<Color>);
-
     return Scaffold(
-      body: AnimatedContainer(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [gradientColors[0], gradientColors[1], Colors.black],
-          ),
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        leading: const Row(
+          children: [
+            SizedBox(width: 16),
+            Icon(Icons.forest_rounded, color: AppTheme.primary, size: 24),
+            SizedBox(width: 8),
+            Text('FORESTGUARD', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.primary, letterSpacing: 1)),
+          ],
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Skip button
-              Align(
-                alignment: Alignment.topRight,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8, right: 8),
-                  child: _currentPage < _pages.length - 1
-                      ? TextButton(
-                          onPressed: () => context.go('/role-select'),
-                          child: Text(
-                            'Skip',
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.5),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        )
-                      : const SizedBox(height: 48),
-                ),
-              ),
-
-              // Pages
-              Expanded(
-                child: PageView.builder(
-                  controller: _controller,
-                  itemCount: _pages.length,
-                  onPageChanged: (i) => setState(() => _currentPage = i),
-                  itemBuilder: (_, i) => _buildPage(_pages[i], i),
-                ),
-              ),
-
-              // Page indicators
-              Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(
-                    _pages.length,
-                    (i) => AnimatedContainer(
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeOutCubic,
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      width: _currentPage == i ? 32 : 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        gradient: _currentPage == i
-                            ? LinearGradient(
-                                colors: [
-                                  (_pages[_currentPage]['accentColor'] as Color),
-                                  (_pages[_currentPage]['accentColor'] as Color).withValues(alpha: 0.6),
-                                ],
-                              )
-                            : null,
-                        color: _currentPage == i ? null : Colors.white.withValues(alpha: 0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // CTA Button
-              Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-                child: SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: _currentPage == _pages.length - 1
-                          ? AppTheme.emeraldGlow
-                          : LinearGradient(colors: [
-                              Colors.white.withValues(alpha: 0.15),
-                              Colors.white.withValues(alpha: 0.08),
-                            ]),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _currentPage == _pages.length - 1
-                            ? Colors.transparent
-                            : Colors.white.withValues(alpha: 0.15),
-                      ),
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () {
-                          if (_currentPage < _pages.length - 1) {
-                            _controller.nextPage(
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeInOutCubic,
-                            );
-                          } else {
-                            context.go('/role-select');
-                          }
-                        },
-                        child: Center(
-                          child: Text(
-                            _currentPage < _pages.length - 1 ? 'Continue' : 'Get Started',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-            ],
+        leadingWidth: 220,
+        actions: [
+          TextButton(
+            onPressed: () => context.go('/role-select'),
+            child: const Text(
+              'Skip',
+              style: TextStyle(color: AppTheme.onSurfaceVariant, fontWeight: FontWeight.bold, fontSize: 13),
+            ),
           ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 20),
+
+            // Page View
+            Expanded(
+              child: PageView.builder(
+                controller: _controller,
+                itemCount: _slides.length,
+                onPageChanged: (i) => setState(() => _currentPage = i),
+                itemBuilder: (ctx, i) => _buildSlide(_slides[i]),
+              ),
+            ),
+
+            // Page Indicator Dots (Image 4)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                _slides.length,
+                (i) => AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  width: _currentPage == i ? 24 : 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _currentPage == i ? AppTheme.primary : AppTheme.outlineVariant.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            // Bottom CTA Button (Image 4)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_currentPage < _slides.length - 1) {
+                      _controller.nextPage(duration: const Duration(milliseconds: 350), curve: Curves.easeOut);
+                    } else {
+                      context.go('/role-select');
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primary,
+                    foregroundColor: Colors.white,
+                    shape: const StadiumBorder(),
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        _currentPage == _slides.length - 1 ? 'Get Started' : 'Next',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward_rounded, size: 18),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildPage(Map<String, dynamic> page, int index) {
-    final accentColor = page['accentColor'] as Color;
-
+  Widget _buildSlide(Map<String, dynamic> slide) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Spacer(flex: 2),
-
-          // Icon with glassmorphism container and glow
-          Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(36),
-              boxShadow: [
-                BoxShadow(
-                  color: accentColor.withValues(alpha: 0.25),
-                  blurRadius: 40,
-                  spreadRadius: 8,
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(36),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.12),
-                    Colors.white.withValues(alpha: 0.04),
-                  ],
-                ),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.15),
-                  width: 1.5,
+          // Circular Artwork Container with Floating Badge & Compass Badge Overlay (Image 4)
+          Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // Outer Soft Mint Ring (Image 4)
+              Container(
+                width: 260,
+                height: 260,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDCEFE6),
+                  shape: BoxShape.circle,
                 ),
               ),
-              child: Center(
-                child: Text(
-                  page['icon'] as String,
-                  style: const TextStyle(fontSize: 64),
+              // Forest Landscape Artwork Circle (Image 4)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(110),
+                child: Image.network(
+                  slide['image'] as String,
+                  width: 220,
+                  height: 220,
+                  fit: BoxFit.cover,
                 ),
               ),
-            ),
+              // Center Compass Icon Badge (Image 4)
+              Container(
+                width: 54,
+                height: 54,
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+                ),
+                child: Center(
+                  child: Icon(slide['icon'] as IconData, color: AppTheme.primary, size: 28),
+                ),
+              ),
+              // Top-Right Floating Badge (Image 4: Deer Activity)
+              Positioned(
+                top: 10,
+                right: -10,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 4))],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.pets_rounded, size: 14, color: AppTheme.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        slide['badge'] as String,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
 
-          const Spacer(),
+          const SizedBox(height: 48),
 
-          // Title
+          // Title & Subtitle (Image 4)
           Text(
-            page['title'] as String,
+            slide['title'] as String,
+            textAlign: TextAlign.center,
             style: const TextStyle(
               fontSize: 28,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.primary,
               letterSpacing: -0.5,
-              height: 1.2,
             ),
-            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 16),
-
-          // Description
+          const SizedBox(height: 12),
           Text(
-            page['desc'] as String,
-            style: TextStyle(
-              fontSize: 15,
-              color: Colors.white.withValues(alpha: 0.6),
-              height: 1.6,
-            ),
+            slide['desc'] as String,
             textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppTheme.onSurfaceVariant,
+              height: 1.4,
+            ),
           ),
-
-          const Spacer(flex: 3),
         ],
       ),
     );

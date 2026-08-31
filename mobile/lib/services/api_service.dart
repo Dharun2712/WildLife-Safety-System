@@ -75,4 +75,13 @@ class ApiService {
     await _storage.delete(key: 'access_token');
     await _storage.delete(key: 'refresh_token');
   }
+
+  Future<bool> updateAlertStatus(String alertId, String status) async {
+    try {
+      final response = await dio.put('/api/alerts/$alertId/status', data: {'status': status});
+      return response.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
+  }
 }

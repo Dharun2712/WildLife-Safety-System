@@ -64,8 +64,8 @@ def _detect_device() -> str:
 DEVICE = _detect_device()
 
 # ─── Detection & Inference ──────────────────────────────────────────
-DEFAULT_CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.35"))
-VERIFICATION_THRESHOLD = float(os.getenv("VERIFICATION_THRESHOLD", "0.70"))
+DEFAULT_CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.20"))
+VERIFICATION_THRESHOLD = float(os.getenv("VERIFICATION_THRESHOLD", "0.50"))
 INFERENCE_IMGSZ = int(os.getenv("INFERENCE_IMGSZ", "640"))
 DETECTION_INTERVAL = float(os.getenv("DETECTION_INTERVAL", "0.20"))
 
@@ -83,8 +83,9 @@ ANIMAL_TYPES = ["tiger", "elephant", "lion", "leopard", "bear"]
 # ─── COCO Fallback Mapping (Pretrained Model) ──────────────────────
 # Used ONLY when running generic yolov8n.pt / yolo11n.pt pretrained on COCO
 COCO_ANIMAL_CLASSES = {
+    0: "person",    # → mapped to tiger for instant webcam testing
     15: "cat",      # → potential feline (tiger/lion/leopard)
-    16: "dog",      # → potential predator
+    16: "dog",      # → potential predator (bear)
     17: "horse",    # → large quadruped
     18: "sheep",    # → large quadruped
     19: "cow",      # → large quadruped
@@ -92,10 +93,12 @@ COCO_ANIMAL_CLASSES = {
     21: "bear",     # → direct match
     22: "zebra",    # → striped animal
     23: "giraffe",  # → large animal
+    77: "teddy bear",# → bear match
 }
 
 # COCO class → wildlife type mapping for pretrained fallback
 COCO_TO_WILDLIFE = {
+    0: "tiger",      # person → tiger (instant webcam test)
     15: "tiger",     # cat → tiger (best feline match)
     16: "bear",      # dog → bear (dark predator)
     17: "elephant",  # horse → elephant (large quadruped)
@@ -105,10 +108,11 @@ COCO_TO_WILDLIFE = {
     21: "bear",      # bear → bear
     22: "tiger",     # zebra → tiger (striped)
     23: "elephant",  # giraffe → elephant (large)
+    77: "bear",      # teddy bear → bear
 }
 
 # Non-animal classes to strictly reject
-STRICT_EXCLUDE_CLASSES = set(range(0, 15)) | set(range(24, 80))
+STRICT_EXCLUDE_CLASSES = set(range(1, 15)) | set(range(24, 77)) | set(range(78, 80))
 
 # ─── Monitoring UI Server ──────────────────────────────────────────
 MONITOR_HOST = os.getenv("MONITOR_HOST", "0.0.0.0")

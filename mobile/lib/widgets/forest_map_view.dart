@@ -153,6 +153,8 @@ class _ForestMapViewState extends State<ForestMapView> {
     }
   }
 
+  int _activeFilterIndex = 0;
+
   @override
   Widget build(BuildContext context) {
     final LatLng center = widget.initialCenter ??
@@ -184,21 +186,21 @@ class _ForestMapViewState extends State<ForestMapView> {
                 // Mudumalai Forest Outer Perimeter
                 Polygon(
                   points: _forestBoundary,
-                  color: Colors.green.withOpacity(0.06),
+                  color: Colors.green.withValues(alpha: 0.06),
                   borderColor: Colors.green.shade700,
                   borderStrokeWidth: 2.0,
                 ),
                 // Zone A Boundary
                 Polygon(
                   points: _zoneABoundary,
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.red.withValues(alpha: 0.08),
                   borderColor: Colors.red.shade400,
                   borderStrokeWidth: 1.5,
                 ),
                 // Zone B Boundary
                 Polygon(
                   points: _zoneBBoundary,
-                  color: Colors.amber.withOpacity(0.06),
+                  color: Colors.amber.withValues(alpha: 0.06),
                   borderColor: Colors.amber.shade600,
                   borderStrokeWidth: 1.5,
                 ),
@@ -217,79 +219,198 @@ class _ForestMapViewState extends State<ForestMapView> {
           ],
         ),
 
-        // Map Control Floating Buttons (Top-Right / Bottom-Right)
-        Positioned(
-          top: 16,
-          right: 16,
-          child: Column(
-            children: [
-              _mapControlButton(
-                icon: Icons.add,
-                onPressed: _zoomIn,
-                tooltip: 'Zoom In',
-              ),
-              const SizedBox(height: 8),
-              _mapControlButton(
-                icon: Icons.remove,
-                onPressed: _zoomOut,
-                tooltip: 'Zoom Out',
-              ),
-              const SizedBox(height: 12),
-              _mapControlButton(
-                icon: Icons.my_location,
-                color: Colors.blueAccent,
-                onPressed: _recenterMyPosition,
-                tooltip: 'My Location',
-              ),
-              const SizedBox(height: 8),
-              _mapControlButton(
-                icon: Icons.park,
-                color: AppTheme.forestGreen,
-                onPressed: _recenterForest,
-                tooltip: 'Forest Center',
-              ),
-            ],
-          ),
-        ),
-
-        // Top Zone Telemetry Ribbon
+        // Floating Search Bar at Top (Image 2)
         Positioned(
           top: 16,
           left: 16,
+          right: 16,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            height: 52,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.grey.shade900.withOpacity(0.9),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade700),
-              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 8)],
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(26),
+              boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 10, offset: Offset(0, 4))],
             ),
             child: Row(
               children: [
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: widget.dangerZones.isNotEmpty ? Colors.redAccent : Colors.greenAccent,
-                    shape: BoxShape.circle,
+                const Icon(Icons.search_rounded, color: AppTheme.onSurfaceVariant, size: 22),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Search locations, wildlife...',
+                    style: TextStyle(fontSize: 14, color: AppTheme.onSurfaceVariant),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.dangerZones.isNotEmpty
-                      ? '${widget.dangerZones.length} Active Threat Zone(s)'
-                      : 'Perimeter Secure • Zone A',
-                  style: TextStyle(
-                    color: widget.dangerZones.isNotEmpty ? Colors.redAccent : Colors.greenAccent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: const BoxDecoration(
+                    color: AppTheme.surfaceContainerHigh,
+                    shape: BoxShape.circle,
                   ),
+                  child: const Icon(Icons.tune_rounded, color: AppTheme.primary, size: 18),
                 ),
               ],
             ),
           ),
         ),
+
+        // Horizontal Map Filter Pills Row
+        Positioned(
+          top: 78,
+          left: 14,
+          right: 14,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterPill(0, Icons.pets_outlined, 'Wildlife'),
+                const SizedBox(width: 8),
+                _buildFilterPill(1, Icons.videocam_outlined, 'Cameras'),
+                const SizedBox(width: 8),
+                _buildFilterPill(2, Icons.warning_amber_rounded, 'Danger Zones', isDanger: true),
+                const SizedBox(width: 8),
+                _buildFilterPill(3, Icons.groups_outlined, 'Tourist Groups'),
+              ],
+            ),
+          ),
+        ),
+
+        // Floating Map Controls (Image 2: Stacked Layer, Zoom, Compass)
+        Positioned(
+          bottom: 24,
+          right: 16,
+          child: Column(
+            children: [
+              _mapControlButton(
+                icon: Icons.layers_outlined,
+                color: AppTheme.primary,
+                onPressed: _recenterForest,
+                tooltip: 'Layers',
+              ),
+              const SizedBox(height: 10),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: AppTheme.ambientShadow,
+                ),
+                child: Column(
+                  children: [
+                    _mapControlButton(
+                      icon: Icons.add,
+                      onPressed: _zoomIn,
+                      tooltip: 'Zoom In',
+                      elevation: 0,
+                    ),
+                    const Divider(height: 1, indent: 8, endIndent: 8),
+                    _mapControlButton(
+                      icon: Icons.remove,
+                      onPressed: _zoomOut,
+                      tooltip: 'Zoom Out',
+                      elevation: 0,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 10),
+              // Target Compass Button with Green Online Indicator (Image 2)
+              Stack(
+                children: [
+                  _mapControlButton(
+                    icon: Icons.my_location,
+                    color: Colors.white,
+                    iconColor: AppTheme.primary,
+                    onPressed: _recenterMyPosition,
+                    tooltip: 'My Location',
+                  ),
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: AppTheme.safeGreen,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _mapControlButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+    required String tooltip,
+    Color color = Colors.white,
+    Color iconColor = AppTheme.primary,
+    double elevation = 2.0,
+  }) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color,
+        shape: BoxShape.circle,
+        boxShadow: elevation > 0 ? AppTheme.ambientShadow : null,
+      ),
+      child: IconButton(
+        icon: Icon(icon, color: iconColor, size: 22),
+        onPressed: onPressed,
+        tooltip: tooltip,
+      ),
+    );
+  }
+
+  Widget _buildFilterPill(int index, IconData icon, String label, {bool isDanger = false}) {
+    final isActive = _activeFilterIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFilterIndex = index),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive
+              ? AppTheme.primary
+              : (isDanger ? const Color(0xFFFFDAD6) : Colors.white),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDanger ? const Color(0xFFBA1A1A) : AppTheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+          boxShadow: AppTheme.ambientShadow,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 16,
+              color: isActive
+                  ? Colors.white
+                  : (isDanger ? const Color(0xFFBA1A1A) : AppTheme.onSurface),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: isActive
+                    ? Colors.white
+                    : (isDanger ? const Color(0xFFBA1A1A) : AppTheme.onSurface),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -307,7 +428,7 @@ class _ForestMapViewState extends State<ForestMapView> {
           point: LatLng(lat, lng),
           radius: radius,
           useRadiusInMeter: true,
-          color: Colors.red.withOpacity(0.18),
+          color: Colors.red.withValues(alpha: 0.18),
           borderColor: Colors.redAccent,
           borderStrokeWidth: 2.0,
         ),
@@ -334,18 +455,18 @@ class _ForestMapViewState extends State<ForestMapView> {
               title: widget.isRanger ? 'Ranger Location' : 'Your GPS Location',
               subtitle: '${_currentPosition!.latitude.toStringAsFixed(4)}° N, ${_currentPosition!.longitude.toStringAsFixed(4)}° E',
               icon: widget.isRanger ? Icons.security : Icons.person_pin_circle,
-              color: widget.isRanger ? AppTheme.forestGreen : Colors.blueAccent,
+              color: widget.isRanger ? AppTheme.primary : Colors.blueAccent,
             ),
             child: Container(
               decoration: BoxDecoration(
-                color: (widget.isRanger ? AppTheme.forestGreen : Colors.blueAccent).withOpacity(0.25),
+                color: (widget.isRanger ? AppTheme.primary : Colors.blueAccent).withValues(alpha: 0.25),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
               child: Center(
                 child: Icon(
                   widget.isRanger ? Icons.security : Icons.my_location,
-                  color: widget.isRanger ? AppTheme.forestGreen : Colors.blueAccent,
+                  color: widget.isRanger ? AppTheme.primary : Colors.blueAccent,
                   size: 22,
                 ),
               ),
@@ -355,44 +476,30 @@ class _ForestMapViewState extends State<ForestMapView> {
       );
     }
 
-    // B. Camera C-01 Sentinel Tower Marker
+    // B. Camera Node C-01 Marker
     markers.add(
       Marker(
         point: _cameraC01Location,
-        width: 50,
-        height: 50,
+        width: 48,
+        height: 48,
         child: GestureDetector(
           onTap: () => _showMarkerDetails(
             context,
-            title: 'Sentinel Camera C-01',
-            subtitle: 'Zone A Mudumalai Perimeter • Live AI Edge Sentinel',
+            title: 'Sentinel Cam C-01',
+            subtitle: 'North Ridge Corridor • 1080p HD IR Live Stream',
             icon: Icons.videocam,
-            color: Colors.greenAccent,
-            actionText: 'View Camera Stream',
-            onAction: () {
-              Navigator.pop(context);
-              DetectionAlertModal.show(
-                context,
-                detection: {
-                  'animal_type': 'tiger',
-                  'confidence': 0.94,
-                  'camera_id': 'C-01',
-                  'latitude': 11.5690,
-                  'longitude': 76.6320,
-                  'verification_status': 'VERIFIED',
-                },
-                isRanger: widget.isRanger,
-              );
-            },
+            color: AppTheme.primary,
           ),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.grey.shade900,
+              color: AppTheme.primary,
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.greenAccent, width: 2),
-              boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 6)],
+              border: Border.all(color: Colors.white, width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)],
             ),
-            child: const Icon(Icons.videocam, color: Colors.greenAccent, size: 24),
+            child: const Center(
+              child: Icon(Icons.videocam, color: Colors.greenAccent, size: 24),
+            ),
           ),
         ),
       ),
@@ -400,8 +507,6 @@ class _ForestMapViewState extends State<ForestMapView> {
 
     // C. Wildlife Threat Markers from Active Alerts/Detections
     for (var alert in widget.alerts) {
-      final animal = (alert['animal_type'] ?? 'wildlife').toString().toLowerCase();
-      final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
       final lat = (alert['latitude'] is num) ? (alert['latitude'] as num).toDouble() : 11.5690;
       final lng = (alert['longitude'] is num) ? (alert['longitude'] as num).toDouble() : 76.6320;
 
@@ -418,13 +523,13 @@ class _ForestMapViewState extends State<ForestMapView> {
             ),
             child: Container(
               decoration: BoxDecoration(
-                color: Colors.red.shade900.withOpacity(0.9),
+                color: Colors.red.shade900.withValues(alpha: 0.9),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.redAccent, width: 2),
                 boxShadow: const [BoxShadow(color: Colors.redAccent, blurRadius: 10)],
               ),
-              child: Center(
-                child: Text(emoji, style: const TextStyle(fontSize: 26)),
+              child: const Center(
+                child: Icon(Icons.pets, color: Colors.white, size: 24),
               ),
             ),
           ),
@@ -469,30 +574,6 @@ class _ForestMapViewState extends State<ForestMapView> {
     }
 
     return markers;
-  }
-
-  Widget _mapControlButton({
-    required IconData icon,
-    required VoidCallback onPressed,
-    required String tooltip,
-    Color color = Colors.white,
-  }) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: Colors.grey.shade900.withOpacity(0.9),
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.grey.shade700),
-        boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 6)],
-      ),
-      child: IconButton(
-        icon: Icon(icon, color: color, size: 20),
-        onPressed: onPressed,
-        tooltip: tooltip,
-        padding: EdgeInsets.zero,
-      ),
-    );
   }
 
   void _showMarkerDetails(

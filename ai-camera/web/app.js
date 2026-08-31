@@ -5,11 +5,11 @@
  */
 
 const ANIMAL_CONFIGS = {
-    tiger: { name: 'Bengal Tiger', emoji: '🐯', color: '#f97316' },
-    elephant: { name: 'Asian Elephant', emoji: '🐘', color: '#00d2ff' },
-    lion: { name: 'Asiatic Lion', emoji: '🦁', color: '#ef4444' },
-    leopard: { name: 'Indian Leopard', emoji: '🐆', color: '#eab308' },
-    bear: { name: 'Sloth Bear', emoji: '🐻', color: '#94a3b8' },
+    tiger: { name: 'Tiger', color: '#f97316' },
+    elephant: { name: 'Elephant', color: '#00d2ff' },
+    lion: { name: 'Lion', color: '#ef4444' },
+    leopard: { name: 'Leopard', color: '#eab308' },
+    bear: { name: 'Bear', color: '#94a3b8' },
 };
 
 // Global State
@@ -140,9 +140,9 @@ function sendDesktopNotification(animalType, confidencePercent, timeStr) {
     if (now - lastBrowserNotificationTime < 1500) return;
     lastBrowserNotificationTime = now;
 
-    const config = ANIMAL_CONFIGS[animalType] || { name: animalType, emoji: '🐾' };
-    new Notification(`🚨 WILDLIFE DETECTED: ${config.name.toUpperCase()}`, {
-        body: `${config.emoji} ${config.name} identified (${confidencePercent}% conf) at ${timeStr} · Dispatched to Rangers & Tourists!`,
+    const config = ANIMAL_CONFIGS[animalType] || { name: animalType };
+    new Notification(`WILDLIFE DETECTED: ${config.name.toUpperCase()}`, {
+        body: `${config.name} identified (${confidencePercent}% conf) at ${timeStr} · Dispatched to Rangers & Tourists!`,
         tag: `wildlife-alert-${now}`,
         requireInteraction: false,
     });
@@ -286,21 +286,20 @@ function showFloatingThreatToast(incident) {
     if (displayedToastIds.has(toastId)) return;
     displayedToastIds.add(toastId);
 
-    const config = ANIMAL_CONFIGS[incident.animal_type] || { name: incident.animal_type, emoji: '🐾' };
+    const config = ANIMAL_CONFIGS[incident.animal_type] || { name: incident.animal_type };
     const confPct = Math.round(incident.confidence * 100);
 
     const toast = document.createElement('div');
     toast.id = toastId;
     toast.className = 'threat-toast';
     toast.innerHTML = `
-        <span class="toast-emoji">${config.emoji}</span>
         <div class="toast-body">
             <div class="toast-header-row">
                 <span class="toast-title">${config.name}</span>
                 <span class="toast-time mono">${incident.time_str || ''}</span>
             </div>
             <div class="toast-sub">${confPct}% AI Match · Zone A</div>
-            <div class="toast-status-pill">⚡ Dispatched to Rangers & Tourists</div>
+            <div class="toast-status-pill">Dispatched to Rangers & Tourists</div>
         </div>
     `;
 
@@ -337,24 +336,25 @@ function renderIncidentStream(incidents) {
     }
 
     feed.innerHTML = incidents.slice(0, 25).map(inc => {
-        const config = ANIMAL_CONFIGS[inc.animal_type] || { name: inc.animal_type, emoji: '🐾' };
+        const config = ANIMAL_CONFIGS[inc.animal_type] || { name: inc.animal_type };
         const confPct = Math.round(inc.confidence * 100);
-        const confClass = inc.confidence >= 0.7 ? 'high' : 'med';
+        const isDanger = confPct >= 70;
+        const iconClass = isDanger ? 'success' : 'muted';
+        const iconName = isDanger ? 'pets' : 'flutter_dash';
 
         return `
-            <div class="incident-card">
-                <span class="inc-emoji">${config.emoji}</span>
-                <div class="inc-info">
-                    <div class="inc-header-row">
-                        <span class="inc-animal-name">${config.name}</span>
-                        <span class="inc-confidence-badge ${confClass} mono">${confPct}%</span>
+            <div class="detection-item">
+                <div class="det-icon-box ${iconClass}">
+                    <span class="material-symbols-outlined">${iconName}</span>
+                </div>
+                <div class="det-info">
+                    <div class="det-info-row">
+                        <h3>${config.name}</h3>
+                        <span class="det-time">${inc.time_str || 'Just now'}</span>
                     </div>
-                    <div class="inc-meta-row">
-                        <span class="mono">${inc.time_str || ''}</span>
-                        <span>·</span>
-                        <span>Zone A</span>
-                        <span>·</span>
-                        <span class="inc-dispatched-tag">✓ Dispatched</span>
+                    <div class="det-meta-row">
+                        <span class="det-confidence">Confidence: ${confPct}%</span>
+                        <button class="det-bookmark"><span class="material-symbols-outlined">bookmark_border</span></button>
                     </div>
                 </div>
             </div>
@@ -399,14 +399,12 @@ function updateThreatMatrix(threatLevel, latestAlert) {
 
         // Show banner if active
         if (banner && latestAlert) {
-            const config = ANIMAL_CONFIGS[latestAlert.animal_type] || { name: latestAlert.animal_type, emoji: '🐾' };
+            const config = ANIMAL_CONFIGS[latestAlert.animal_type] || { name: latestAlert.animal_type };
             const bannerTitle = document.getElementById('banner-animal-title');
             const bannerDesc = document.getElementById('banner-animal-desc');
-            const bannerEmoji = document.getElementById('banner-animal-emoji');
 
             if (bannerTitle) bannerTitle.textContent = `${config.name.toUpperCase()} DETECTED IN ZONE A`;
-            if (bannerDesc) bannerDesc.textContent = `${config.emoji} ${Math.round(latestAlert.confidence * 100)}% match at ${latestAlert.time_str}. Notification automatically broadcasted to all tourists & rangers.`;
-            if (bannerEmoji) bannerEmoji.textContent = config.emoji;
+            if (bannerDesc) bannerDesc.textContent = `${Math.round(latestAlert.confidence * 100)}% match at ${latestAlert.time_str}. Notification automatically broadcasted to all tourists & rangers.`;
 
             banner.style.display = 'block';
         }

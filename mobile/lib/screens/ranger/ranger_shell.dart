@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/theme.dart';
-import '../../config/constants.dart';
 import '../../providers/providers.dart';
-import '../../services/api_service.dart';
 import '../../widgets/forest_map_view.dart';
 import '../../widgets/detection_alert_modal.dart';
+import '../../widgets/sos_active_dialog.dart';
+import '../camera/camera_monitoring_screen.dart';
 
 class RangerShell extends ConsumerStatefulWidget {
   const RangerShell({super.key});
@@ -44,7 +44,6 @@ class _RangerShellState extends ConsumerState<RangerShell> {
 
         final data = event['data'] is Map ? Map<String, dynamic>.from(event['data']) : event;
 
-        // Invalidate providers so map and alerts refresh reactively
         ref.invalidate(dangerZonesProvider);
         ref.invalidate(alertsProvider);
         ref.invalidate(touristsProvider);
@@ -56,7 +55,10 @@ class _RangerShellState extends ConsumerState<RangerShell> {
             detection: data,
             isRanger: true,
             onViewOnMap: () {
-              setState(() => _currentIndex = 2); // Switch to Ranger Map tab
+              setState(() => _currentIndex = 2);
+            },
+            onTriggerSOS: () {
+              SOSActiveDialog.show(context);
             },
           );
         }
@@ -72,7 +74,7 @@ class _RangerShellState extends ConsumerState<RangerShell> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          _RangerHomeTab(auth: auth),
+          _RangerHomeTab(auth: auth, onViewMap: () => setState(() => _currentIndex = 2)),
           const _RangerAlertsTab(),
           const _RangerMapTab(),
           const _RangerMonitorTab(),
@@ -85,12 +87,16 @@ class _RangerShellState extends ConsumerState<RangerShell> {
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppTheme.surfaceContainerLowest,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+          border: const Border(
+            top: BorderSide(color: AppTheme.primary, width: 4),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
-              blurRadius: 20,
-              offset: const Offset(0, -4),
+              color: const Color(0xFF2D3436).withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, -8),
             ),
           ],
         ),
@@ -99,9 +105,9 @@ class _RangerShellState extends ConsumerState<RangerShell> {
           onDestinationSelected: (i) => setState(() => _currentIndex = i),
           destinations: const [
             NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Home'),
-            NavigationDestination(icon: Icon(Icons.notification_important_outlined), selectedIcon: Icon(Icons.notification_important_rounded), label: 'Alerts'),
+            NavigationDestination(icon: Icon(Icons.warning_amber_rounded), selectedIcon: Icon(Icons.warning_rounded), label: 'Alerts'),
             NavigationDestination(icon: Icon(Icons.map_outlined), selectedIcon: Icon(Icons.map_rounded), label: 'Map'),
-            NavigationDestination(icon: Icon(Icons.videocam_outlined), selectedIcon: Icon(Icons.videocam_rounded), label: 'Monitor'),
+            NavigationDestination(icon: Icon(Icons.visibility_outlined), selectedIcon: Icon(Icons.visibility_rounded), label: 'Monitor'),
             NavigationDestination(icon: Icon(Icons.person_outline_rounded), selectedIcon: Icon(Icons.person_rounded), label: 'Profile'),
           ],
         ),
@@ -111,764 +117,452 @@ class _RangerShellState extends ConsumerState<RangerShell> {
 }
 
 // ═══════════════════════════════════════════════════
-// 1. RANGER HOME TAB — Tactical Dashboard
+// 1. RANGER HOME TAB — Stitch Command Dashboard
 // ═══════════════════════════════════════════════════
 class _RangerHomeTab extends ConsumerWidget {
   final AuthState auth;
-  const _RangerHomeTab({required this.auth});
+  final VoidCallback onViewMap;
+
+  const _RangerHomeTab({required this.auth, required this.onViewMap});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final alertsAsync = ref.watch(alertsProvider);
-    final zonesAsync = ref.watch(dangerZonesProvider);
-    final camerasAsync = ref.watch(camerasProvider);
-    final detectionsAsync = ref.watch(detectionsProvider);
+    final rangerName = auth.user?['full_name'] ?? 'Officer Miller';
 
     return Scaffold(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        scrolledUnderElevation: 1,
+        title: const Row(
+          children: [
+            Icon(Icons.shield_rounded, color: AppTheme.primary, size: 24),
+            SizedBox(width: 8),
+            Text('ForestGuard', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.primary)),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: AppTheme.primary),
+            onPressed: () {
+              ref.invalidate(alertsProvider);
+              ref.invalidate(dangerZonesProvider);
+              ref.invalidate(camerasProvider);
+            },
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(alertsProvider);
           ref.invalidate(dangerZonesProvider);
           ref.invalidate(camerasProvider);
-          ref.invalidate(detectionsProvider);
         },
-        child: CustomScrollView(
-          slivers: [
-            // Ranger gradient app bar
-            SliverAppBar(
-              expandedHeight: 170,
-              pinned: true,
-              backgroundColor: AppTheme.rangerBlue,
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
-                  onPressed: () {
-                    ref.invalidate(alertsProvider);
-                    ref.invalidate(dangerZonesProvider);
-                    ref.invalidate(camerasProvider);
-                    ref.invalidate(detectionsProvider);
-                  },
-                )
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  decoration: const BoxDecoration(gradient: AppTheme.rangerGradient),
-                  child: SafeArea(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 48, 20, 16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Officer ${auth.user?['full_name'] ?? 'Ranger'} 🛡️',
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: Colors.white,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      'Mudumalai Wildlife Reserve',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: Colors.white.withValues(alpha: 0.6),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 8, height: 8,
-                                      decoration: BoxDecoration(
-                                        color: AppTheme.safeGreen,
-                                        shape: BoxShape.circle,
-                                        boxShadow: [BoxShadow(color: AppTheme.safeGreen.withValues(alpha: 0.4), blurRadius: 4)],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    const Text('ON DUTY', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.5)),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Header Section
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Good Morning, $rangerName',
+                  style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppTheme.primary, letterSpacing: -0.5),
                 ),
-              ),
-              title: const Text('Ranger HQ'),
+                const SizedBox(height: 4),
+                const Row(
+                  children: [
+                    Icon(Icons.location_on_outlined, size: 16, color: AppTheme.onSurfaceVariant),
+                    SizedBox(width: 4),
+                    Text('Assignment: ', style: TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant)),
+                    Text('Demo Forest • All Zones', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppTheme.onSurface)),
+                  ],
+                ),
+              ],
             ),
 
-            SliverPadding(
-              padding: const EdgeInsets.all(16),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  // Metric Cards Grid
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _GlassMetricCard(
-                          title: 'Active Alerts',
-                          count: alertsAsync.value?.where((a) => a['status'] == 'active' || a['status'] == 'needs_verification' || a['status'] == 'monitoring').length.toString() ?? '...',
-                          icon: Icons.warning_amber_rounded,
-                          color: AppTheme.dangerRed,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _GlassMetricCard(
-                          title: 'Danger Zones',
-                          count: zonesAsync.value?.length.toString() ?? '...',
-                          icon: Icons.radar_rounded,
-                          color: AppTheme.approachingAmber,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _GlassMetricCard(
-                          title: 'Live Cameras',
-                          count: '${camerasAsync.value?.where((c) => c['status'] == 'online').length ?? 0}/${camerasAsync.value?.length ?? 0}',
-                          icon: Icons.videocam_rounded,
-                          color: AppTheme.rangerBlue,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _GlassMetricCard(
-                          title: 'Detections',
-                          count: detectionsAsync.value?.length.toString() ?? '...',
-                          icon: Icons.pets_rounded,
-                          color: AppTheme.forestGreen,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+            const SizedBox(height: 20),
 
-                  // Action Required
-                  Row(
-                    children: [
-                      Icon(Icons.priority_high_rounded, size: 20, color: AppTheme.dangerRed),
-                      const SizedBox(width: 8),
-                      const Text('Action Required', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                    ],
+            // Stitch 4-Card Stats Bento Grid
+            Row(
+              children: [
+                Expanded(
+                  child: _StitchStatBentoCard(
+                    title: 'Active Alerts',
+                    count: alertsAsync.value?.where((a) => a['status'] == 'active' || a['status'] == 'needs_verification').length.toString() ?? '3',
+                    icon: Icons.campaign_rounded,
+                    isDanger: true,
                   ),
-                  const SizedBox(height: 10),
-                  alertsAsync.when(
-                    data: (alerts) {
-                      final pending = alerts.where((a) => a['status'] == 'needs_verification' || a['status'] == 'active').toList();
-                      if (pending.isEmpty) {
-                        return _PremiumEmptyState(
-                          icon: Icons.check_circle_outline_rounded,
-                          color: AppTheme.safeGreen,
-                          title: 'All Sectors Normal',
-                          subtitle: 'No pending alerts require your attention',
-                        );
-                      }
-                      return Column(
-                        children: pending.take(3).map((a) => _RangerAlertActionCard(alert: a, ref: ref)).toList(),
-                      );
-                    },
-                    loading: () => const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator())),
-                    error: (err, _) => Text('Error: $err'),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StitchStatBentoCard(
+                    title: 'Pending',
+                    count: '2',
+                    icon: Icons.schedule_rounded,
                   ),
-                  const SizedBox(height: 28),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StitchStatBentoCard(
+                    title: 'Resolved',
+                    count: '14',
+                    icon: Icons.check_circle_rounded,
+                    iconColor: AppTheme.secondary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _StitchStatBentoCard(
+                    title: 'Tourists',
+                    count: '12',
+                    icon: Icons.groups_rounded,
+                  ),
+                ),
+              ],
+            ),
 
-                  // Recent Detections
-                  Row(
-                    children: [
-                      Icon(Icons.timeline_rounded, size: 20, color: AppTheme.forestGreen),
-                      const SizedBox(width: 8),
-                      const Text('Recent AI Detections', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  detectionsAsync.when(
-                    data: (dets) {
-                      if (dets.isEmpty) {
-                        return _PremiumEmptyState(
-                          icon: Icons.pets_rounded,
-                          color: Colors.grey,
-                          title: 'No detections yet',
-                          subtitle: 'AI camera detections will appear here',
-                        );
-                      }
-                      return Column(
-                        children: dets.take(4).map((d) {
-                          final animal = d['animal_type'] ?? 'unknown';
-                          final isSim = d['is_simulation'] == true;
-                          final conf = (((d['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
-                          final animalColor = AppTheme.animalColors[animal] ?? Colors.grey;
+            const SizedBox(height: 20),
 
-                          return Container(
-                            margin: const EdgeInsets.only(bottom: 10),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(16),
-                              boxShadow: AppTheme.elevatedShadow,
-                            ),
-                            child: IntrinsicHeight(
-                              child: Row(
+            // Priority Action Required Title
+            const Row(
+              children: [
+                Icon(Icons.warning_rounded, color: AppTheme.error, size: 22),
+                SizedBox(width: 8),
+                Text('Priority Action Required', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.onSurface)),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            // Large Critical Alert Card (Tiger Sighting Hero Card)
+            Container(
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppTheme.error, width: 2),
+                boxShadow: AppTheme.sosShadow,
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Image Area
+                  Stack(
+                    children: [
+                      Container(
+                        height: 160,
+                        width: double.infinity,
+                        decoration: const BoxDecoration(
+                          image: DecorationImage(
+                            image: NetworkImage('https://images.unsplash.com/photo-1561731216-c3a4d99437d5?auto=format&fit=crop&w=800&q=80'),
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 12,
+                        left: 12,
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(color: AppTheme.error, borderRadius: BorderRadius.circular(20)),
+                              child: const Row(
                                 children: [
-                                  Container(
-                                    width: 4,
-                                    decoration: BoxDecoration(
-                                      color: animalColor,
-                                      borderRadius: const BorderRadius.only(
-                                        topLeft: Radius.circular(16),
-                                        bottomLeft: Radius.circular(16),
-                                      ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(14),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 44,
-                                            height: 44,
-                                            decoration: BoxDecoration(
-                                              color: animalColor.withValues(alpha: 0.1),
-                                              borderRadius: BorderRadius.circular(12),
-                                            ),
-                                            child: Center(
-                                              child: Text(
-                                                AppConstants.animalEmojis[animal] ?? '🐾',
-                                                style: const TextStyle(fontSize: 24),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  '${AppConstants.animalNames[animal] ?? animal} ${isSim ? "(Sim)" : ""}',
-                                                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  'Camera: ${d['camera_id']} • Conf: $conf%',
-                                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                                                ),
-                                              ],
-                                            ),
-                                          ),
-                                          Text(
-                                            d['timestamp'] != null
-                                                ? d['timestamp'].toString().split('T').last.split('.').first
-                                                : '',
-                                            style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
+                                  Icon(Icons.pets_rounded, color: Colors.white, size: 12),
+                                  SizedBox(width: 4),
+                                  Text('Tiger', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                                 ],
                               ),
                             ),
-                          );
-                        }).toList(),
-                      );
-                    },
-                    loading: () => const Center(child: CircularProgressIndicator()),
-                    error: (_, __) => const SizedBox(),
-                  ),
-                  const SizedBox(height: 16),
-                ]),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// Premium glassmorphism metric card
-class _GlassMetricCard extends StatelessWidget {
-  final String title;
-  final String count;
-  final IconData icon;
-  final Color color;
-
-  const _GlassMetricCard({required this.title, required this.count, required this.icon, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: color.withValues(alpha: 0.12)),
-        boxShadow: [
-          BoxShadow(
-            color: color.withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-          ...AppTheme.elevatedShadow,
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [color.withValues(alpha: 0.15), color.withValues(alpha: 0.05)],
-              ),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(count, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
-                const SizedBox(height: 2),
-                Text(title, style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// Premium empty state
-class _PremiumEmptyState extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-
-  const _PremiumEmptyState({required this.icon, required this.color, required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppTheme.elevatedShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                const SizedBox(height: 2),
-                Text(subtitle, style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════
-// 2. RANGER ALERTS TAB & ACTIONS
-// ═══════════════════════════════════════════════════
-class _RangerAlertsTab extends ConsumerWidget {
-  const _RangerAlertsTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final alertsAsync = ref.watch(alertsProvider);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Incident Management'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => ref.invalidate(alertsProvider),
-          )
-        ],
-      ),
-      body: alertsAsync.when(
-        data: (alerts) {
-          if (alerts.isEmpty) {
-            return Center(
-              child: _PremiumEmptyState(
-                icon: Icons.inbox_rounded,
-                color: Colors.grey,
-                title: 'No incidents',
-                subtitle: 'Incidents will appear here',
-              ),
-            );
-          }
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(alertsProvider),
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: alerts.length,
-              itemBuilder: (ctx, i) => _RangerAlertActionCard(alert: alerts[i], ref: ref),
-            ),
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error loading alerts: $err')),
-      ),
-    );
-  }
-}
-
-class _RangerAlertActionCard extends StatelessWidget {
-  final Map<String, dynamic> alert;
-  final WidgetRef ref;
-
-  const _RangerAlertActionCard({required this.alert, required this.ref});
-
-  @override
-  Widget build(BuildContext context) {
-    final animal = alert['animal_type'] ?? 'unknown';
-    final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
-    final status = alert['status'] ?? 'unknown';
-    final isNeedsVerify = status == 'needs_verification';
-    final isActive = status == 'active';
-    final isAck = status == 'acknowledged' || status == 'monitoring';
-    final isClosed = status == 'closed' || status == 'rejected';
-    final alertId = alert['id'] ?? '';
-    final conf = (((alert['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
-    final statusColor = AppTheme.getStatusColor(status);
-    final animalColor = AppTheme.animalColors[animal] ?? Colors.grey;
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: (isNeedsVerify || isActive) ? statusColor.withValues(alpha: 0.3) : Colors.grey.shade200,
-          width: (isNeedsVerify || isActive) ? 1.5 : 1,
-        ),
-        boxShadow: [
-          if (isNeedsVerify || isActive)
-            BoxShadow(
-              color: statusColor.withValues(alpha: 0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 4),
-            ),
-          ...AppTheme.elevatedShadow,
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: animalColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Center(child: Text(emoji, style: const TextStyle(fontSize: 26))),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '${AppConstants.animalNames[animal] ?? animal} Incident',
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.6),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: const Text('Zone A', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Zone ${alert['zone_code'] ?? 'A'} • Conf: $conf% • ${alertId.toString().substring(0, alertId.toString().length > 8 ? 8 : alertId.toString().length)}',
-                        style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                      Positioned(
+                        bottom: 12,
+                        right: 12,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.verified_rounded, color: AppTheme.secondaryContainer, size: 14),
+                              SizedBox(width: 4),
+                              Text('94% Confidence', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.getStatusGradient(status),
-                    borderRadius: BorderRadius.circular(8),
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Apex Predator Detected', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.onSurface)),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(color: AppTheme.errorContainer, borderRadius: BorderRadius.circular(6)),
+                              child: const Text('5m ago', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.error)),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          'Motion sensor triggered. Subject confirmed via ML model. Tourist groups in adjacent Zone B require immediate rerouting.',
+                          style: TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant, height: 1.4),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  DetectionAlertModal.show(
+                                    context,
+                                    detection: {'animal_type': 'tiger', 'confidence': 0.94, 'status': 'active'},
+                                    isRanger: true,
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+                                child: const Text('VIEW ALERT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: onViewMap,
+                                icon: const Icon(Icons.map_rounded, size: 16),
+                                label: const Text('VIEW MAP', style: TextStyle(fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                  child: Text(
-                    status.toUpperCase(),
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 10, letterSpacing: 0.5),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              'Lat ${(alert['latitude'] as num?)?.toStringAsFixed(4)}, Lng ${(alert['longitude'] as num?)?.toStringAsFixed(4)}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-            ),
-            const Divider(height: 20),
-
-            // Action buttons
-            if (!isClosed)
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  if (isNeedsVerify) ...[
-                    _actionButton(
-                      context,
-                      icon: Icons.check_rounded,
-                      label: 'Verify & Activate',
-                      gradient: const LinearGradient(colors: [Color(0xFF059669), Color(0xFF22C55E)]),
-                      onTap: () => _executeAction(context, '/api/alerts/$alertId/verify', 'Verified & Activated'),
-                    ),
-                    _actionButton(
-                      context,
-                      icon: Icons.close_rounded,
-                      label: 'Reject',
-                      isOutlined: true,
-                      outlineColor: AppTheme.dangerRed,
-                      onTap: () => _executeAction(context, '/api/alerts/$alertId/reject', 'Detection Rejected'),
-                    ),
-                  ],
-                  if (isActive)
-                    _actionButton(
-                      context,
-                      icon: Icons.done_all_rounded,
-                      label: 'Acknowledge',
-                      gradient: AppTheme.rangerGradient,
-                      onTap: () => _executeAction(context, '/api/alerts/$alertId/acknowledge', 'Alert Acknowledged'),
-                    ),
-                  if (isActive || isAck) ...[
-                    _actionButton(
-                      context,
-                      icon: Icons.edit_location_alt_rounded,
-                      label: 'Move Zone',
-                      isOutlined: true,
-                      onTap: () => _showUpdateLocationDialog(context, alertId, (alert['latitude'] as num?)?.toDouble() ?? 11.569, (alert['longitude'] as num?)?.toDouble() ?? 76.632),
-                    ),
-                    _actionButton(
-                      context,
-                      icon: Icons.people_outline_rounded,
-                      label: 'Tourists',
-                      isOutlined: true,
-                      onTap: () => _showTouristsInZoneDialog(context, alertId),
-                    ),
-                    _actionButton(
-                      context,
-                      icon: Icons.lock_outline_rounded,
-                      label: 'Close Alert',
-                      gradient: AppTheme.dangerGradient,
-                      onTap: () => _executeAction(context, '/api/alerts/$alertId/close', 'Alert Closed'),
-                    ),
-                  ],
                 ],
-              )
-            else
-              Text(
-                'Incident Resolved / Closed by Ranger.',
-                style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.grey.shade500),
               ),
+            ),
+
+            const SizedBox(height: 24),
+
+            // RANGER COMMAND Reports & Analytics Section (Image 4)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceContainerLowest,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+                boxShadow: AppTheme.ambientShadow,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('RANGER COMMAND', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary, letterSpacing: 1)),
+                          Text('Reports & Analytics', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.onSurface)),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        onPressed: () {},
+                        style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary, foregroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8)),
+                        icon: const Icon(Icons.download_rounded, size: 16),
+                        label: const Text('Export', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Top Metrics Cards Row (Image 4)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: AppTheme.surfaceContainerLow, borderRadius: BorderRadius.circular(16)),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Total Detections', style: TextStyle(fontSize: 10, color: AppTheme.onSurfaceVariant)),
+                              SizedBox(height: 4),
+                              Text('1,248', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.onSurface)),
+                              Text('+12% vs last month', style: TextStyle(fontSize: 9, color: AppTheme.secondary, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: AppTheme.surfaceContainerLow, borderRadius: BorderRadius.circular(16)),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Active Alerts', style: TextStyle(fontSize: 10, color: AppTheme.onSurfaceVariant)),
+                              SizedBox(height: 4),
+                              Text('14', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: AppTheme.onSurface)),
+                              Text('3 High Priority', style: TextStyle(fontSize: 9, color: Color(0xFFBA1A1A), fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 10),
+
+                  // Avg Response Time Hero Card (Image 4)
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Avg Response Time', style: TextStyle(fontSize: 10, color: Colors.white70)),
+                        const SizedBox(height: 2),
+                        const Text('12m 45s', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Color(0xFFA0F4C8))),
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: const LinearProgressIndicator(
+                            value: 0.75,
+                            backgroundColor: Colors.white24,
+                            valueColor: AlwaysStoppedAnimation(Color(0xFFA0F4C8)),
+                            minHeight: 6,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Response Timeline Section (Image 4)
+                  const Text('Response Timeline', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppTheme.onSurface)),
+                  const SizedBox(height: 10),
+                  _buildTimelineItem('Poaching Alert Triggered', 'Sector 4, Near River Basin • 10:42 AM', const Color(0xFFBA1A1A)),
+                  _buildTimelineItem('Acknowledged by Unit Alpha', 'Ranger J. Smith en route • 10:45 AM', AppTheme.secondary),
+                  _buildTimelineItem('On Scene Investigation', 'Status pending update • In Progress', AppTheme.outlineVariant),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 30),
           ],
         ),
       ),
     );
   }
 
-  Widget _actionButton(BuildContext context, {
-    required IconData icon,
-    required String label,
-    LinearGradient? gradient,
-    bool isOutlined = false,
-    Color? outlineColor,
-    required VoidCallback onTap,
-  }) {
-    if (isOutlined) {
-      return OutlinedButton.icon(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: outlineColor ?? AppTheme.textPrimary,
-          side: BorderSide(color: (outlineColor ?? Colors.grey).withValues(alpha: 0.3)),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        ),
-        icon: Icon(icon, size: 16),
-        label: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-        onPressed: onTap,
-      );
-    }
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+  Widget _buildTimelineItem(String title, String subtitle, Color dotColor) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          CircleAvatar(radius: 5, backgroundColor: dotColor),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, size: 16, color: Colors.white),
-                const SizedBox(width: 6),
-                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white)),
+                Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.onSurface)),
+                Text(subtitle, style: const TextStyle(fontSize: 10, color: AppTheme.onSurfaceVariant)),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _executeAction(BuildContext context, String endpoint, String successMsg) async {
-    try {
-      await ApiService().dio.patch(endpoint);
-      ref.invalidate(alertsProvider);
-      ref.invalidate(dangerZonesProvider);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ $successMsg')));
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Action failed: $e')));
-      }
-    }
-  }
-
-  void _showUpdateLocationDialog(BuildContext context, String alertId, double currentLat, double currentLng) {
-    final latCtl = TextEditingController(text: (currentLat + 0.0015).toStringAsFixed(4));
-    final lngCtl = TextEditingController(text: (currentLng + 0.0015).toStringAsFixed(4));
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Move Danger Zone Center'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Enter updated wildlife coordinates to dynamically move the active danger zone for all tourists and rangers in real-time.', style: TextStyle(fontSize: 12)),
-            const SizedBox(height: 12),
-            TextField(controller: latCtl, decoration: const InputDecoration(labelText: 'New Latitude')),
-            const SizedBox(height: 8),
-            TextField(controller: lngCtl, decoration: const InputDecoration(labelText: 'New Longitude')),
-          ],
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () async {
-              final newLat = double.tryParse(latCtl.text);
-              final newLng = double.tryParse(lngCtl.text);
-              if (newLat == null || newLng == null) return;
-              Navigator.pop(ctx);
-              try {
-                await ApiService().dio.patch('/api/alerts/$alertId/location', data: {
-                  'latitude': newLat,
-                  'longitude': newLng,
-                });
-                ref.invalidate(alertsProvider);
-                ref.invalidate(dangerZonesProvider);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('✅ Wildlife danger zone moved in real-time!')));
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Location update failed: $e')));
-                }
-              }
-            },
-            child: const Text('Broadcast Update'),
           ),
         ],
       ),
     );
   }
+}
 
-  void _showTouristsInZoneDialog(BuildContext context, String alertId) async {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tourists in Zone'),
-        content: FutureBuilder(
-          future: ApiService().dio.get('/api/tourists/locations/nearby', queryParameters: {'alert_id': alertId}),
-          builder: (ctx, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const SizedBox(height: 100, child: Center(child: CircularProgressIndicator()));
-            }
-            if (snapshot.hasError) {
-              return Text('Error: ${snapshot.error}');
-            }
-            final data = snapshot.data?.data as Map<String, dynamic>?;
-            final tourists = data?['tourists'] as List<dynamic>? ?? [];
-            if (tourists.isEmpty) {
-              return const Text('No tourists currently detected in this danger zone.');
-            }
-            return SizedBox(
-              width: double.maxFinite,
-              height: 200,
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: tourists.length,
-                itemBuilder: (ctx, i) {
-                  final t = tourists[i];
-                  return ListTile(
-                    leading: const Icon(Icons.person_pin_circle, color: AppTheme.dangerRed),
-                    title: Text('Tourist ID: ${t['tourist_id'].toString().substring(0, 6)}...'),
-                    subtitle: Text('Distance: ${t['distance_meters']}m • Status: ${t['status']}'),
-                  );
-                },
-              ),
-            );
-          },
+class _StitchStatBentoCard extends StatelessWidget {
+  final String title;
+  final String count;
+  final IconData icon;
+  final bool isDanger;
+  final Color? iconColor;
+
+  const _StitchStatBentoCard({
+    required this.title,
+    required this.count,
+    required this.icon,
+    this.isDanger = false,
+    this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDanger ? AppTheme.errorContainer : AppTheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDanger ? AppTheme.error.withValues(alpha: 0.3) : AppTheme.outlineVariant.withValues(alpha: 0.3),
         ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title.toUpperCase(),
+                style: TextStyle(
+                  fontSize: 9,
+                  fontWeight: FontWeight.bold,
+                  color: isDanger ? AppTheme.onErrorContainer : AppTheme.onSurfaceVariant,
+                ),
+              ),
+              Icon(
+                icon,
+                size: 16,
+                color: isDanger ? AppTheme.error : (iconColor ?? AppTheme.primary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            count,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w900,
+              color: isDanger ? AppTheme.error : AppTheme.onSurface,
+            ),
+          ),
         ],
       ),
     );
@@ -876,7 +570,473 @@ class _RangerAlertActionCard extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════
-// 3. RANGER MAP TAB
+// 2. ALERTS TAB (Matching Image 4: Alerts Main Screen)
+// ═══════════════════════════════════════════════════
+class _RangerAlertsTab extends StatefulWidget {
+  const _RangerAlertsTab();
+
+  @override
+  State<_RangerAlertsTab> createState() => _RangerAlertsTabState();
+}
+
+class _RangerAlertsTabState extends State<_RangerAlertsTab> {
+  int _activeTabIndex = 0; // 0: ACTIVE, 1: PENDING, 2: RESOLVED
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.menu_rounded, color: AppTheme.primary),
+          onPressed: () {},
+        ),
+        title: const Text(
+          'ForestGuard',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.primary),
+        ),
+        centerTitle: true,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: AppTheme.surfaceContainerHigh,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Text(
+                'RM',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        children: [
+          // Header Row with Filter Icon Button (Image 4)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Alerts',
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.primary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              Container(
+                width: 40,
+                height: 40,
+                decoration: const BoxDecoration(
+                  color: AppTheme.surfaceContainerHigh,
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.tune_rounded, color: AppTheme.primary, size: 20),
+                  onPressed: () {},
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // Tab Filter Pills Row: ACTIVE / PENDING / RESOLVED (Image 4)
+          Row(
+            children: [
+              _buildTabPill(0, 'ACTIVE', isRed: true),
+              const SizedBox(width: 10),
+              _buildTabPill(1, 'PENDING'),
+              const SizedBox(width: 10),
+              _buildTabPill(2, 'RESOLVED'),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // Card 1: Tiger Sighting (Red Accent - Image 4)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFFFDAD6)),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(left: BorderSide(color: Color(0xFFBA1A1A), width: 5)),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFFFDAD6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.warning_amber_rounded, color: Color(0xFFBA1A1A), size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Tiger Sighting',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFFDAD6),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'ACTIVE',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Color(0xFFBA1A1A)),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Row(
+                              children: [
+                                Icon(Icons.location_on_outlined, size: 12, color: AppTheme.onSurfaceVariant),
+                                SizedBox(width: 2),
+                                Text('Zone Alpha-4', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('CAMERA', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('Cam_N_12', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.onSurface)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('CONFIDENCE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('98%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFBA1A1A))),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TIME', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('2 mins ago', style: TextStyle(fontSize: 14, color: AppTheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFBA1A1A),
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: const Text('DISPATCH UNIT', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {},
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.surfaceContainerHigh,
+                            foregroundColor: AppTheme.onSurface,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: const Text('VIEW FEED', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Card 2: Bear Activity (Mint Accent - Image 4)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(left: BorderSide(color: Color(0xFFA0F4C8), width: 5)),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFE5F7ED),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.pets_rounded, color: AppTheme.secondary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Bear Activity',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE5F7ED),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'ACTIVE',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.secondary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Row(
+                              children: [
+                                Icon(Icons.location_on_outlined, size: 12, color: AppTheme.onSurfaceVariant),
+                                SizedBox(width: 2),
+                                Text('Sector 3 – Riverbend', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('CAMERA', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('Trail_C_04', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.onSurface)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('CONFIDENCE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('85%', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.secondary)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TIME', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('15 mins ago', style: TextStyle(fontSize: 14, color: AppTheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Card 3: Sensor Disturbance (Dark Green Accent - Image 4)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              decoration: const BoxDecoration(
+                border: Border(left: BorderSide(color: AppTheme.primary, width: 5)),
+              ),
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceContainerHigh,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.sensors_rounded, color: AppTheme.primary, size: 22),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                const Text(
+                                  'Sensor Disturbance',
+                                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.primary),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.surfaceContainerHigh,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    'ACTIVE',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: AppTheme.primary),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            const Row(
+                              children: [
+                                Icon(Icons.location_on_outlined, size: 12, color: AppTheme.onSurfaceVariant),
+                                SizedBox(width: 2),
+                                Text('Perimeter Fence East', style: TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  const Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('SENSOR', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('Motion_E_99', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.onSurface)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TYPE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('Vibration', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.onSurface)),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('TIME', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant, letterSpacing: 0.5)),
+                          SizedBox(height: 2),
+                          Text('42 mins ago', style: TextStyle(fontSize: 14, color: AppTheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabPill(int index, String label, {bool isRed = false}) {
+    final isActive = _activeTabIndex == index;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _activeTabIndex = index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive
+                ? (isRed ? const Color(0xFFBA1A1A) : AppTheme.primary)
+                : AppTheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                color: isActive ? Colors.white : AppTheme.onSurfaceVariant,
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// 3. MAP TAB
 // ═══════════════════════════════════════════════════
 class _RangerMapTab extends ConsumerWidget {
   const _RangerMapTab();
@@ -888,371 +1048,463 @@ class _RangerMapTab extends ConsumerWidget {
     final touristsAsync = ref.watch(touristsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Tactical Map')),
-      body: zonesAsync.when(
-        data: (zones) {
-          final alerts = alertsAsync.value ?? [];
-          final tourists = touristsAsync.value ?? [];
-          return Stack(
-            children: [
-              ForestMapView(
-                dangerZones: zones,
-                alerts: alerts,
-                touristLocations: tourists,
-                isRanger: true,
-              ),
-              // Frosted glass legend
-              Positioned(
-                bottom: 16,
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade900.withValues(alpha: 0.92),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Tactical Legend', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.white, letterSpacing: 0.5)),
-                      const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _legendItem('🐯 Tiger', const Color(0xFFFF6F00)),
-                          _legendItem('🐘 Elephant', const Color(0xFF00D2FF)),
-                          _legendItem('🦁 Lion', const Color(0xFFEF4444)),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (_, __) => const Center(child: Text('Unable to load map data')),
+      body: ForestMapView(
+        dangerZones: zonesAsync.value ?? [],
+        alerts: alertsAsync.value ?? [],
+        touristLocations: touristsAsync.value ?? [],
+        isRanger: true,
       ),
-    );
-  }
-
-  Widget _legendItem(String title, Color color) {
-    return Row(
-      children: [
-        Container(
-          width: 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 4)],
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
-      ],
     );
   }
 }
 
 // ═══════════════════════════════════════════════════
-// 4. RANGER MONITOR TAB
+// 4. MONITOR TAB (Image 1: Active Cameras Monitoring)
 // ═══════════════════════════════════════════════════
-class _RangerMonitorTab extends ConsumerWidget {
+class _RangerMonitorTab extends StatelessWidget {
   const _RangerMonitorTab();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final camerasAsync = ref.watch(camerasProvider);
-    final detReportAsync = ref.watch(reportsProvider('detections'));
-    final incReportAsync = ref.watch(reportsProvider('incidents'));
-
-    return Scaffold(
-      appBar: AppBar(title: const Text('Monitor & Analytics')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Row(
-            children: [
-              Icon(Icons.videocam_rounded, size: 20, color: AppTheme.rangerBlue),
-              const SizedBox(width: 8),
-              const Text('Camera Network', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          camerasAsync.when(
-            data: (cameras) => Column(
-              children: cameras.map((c) {
-                final isOnline = c['status'] == 'online';
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: AppTheme.elevatedShadow,
-                  ),
-                  child: ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                    leading: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: (isOnline ? AppTheme.safeGreen : Colors.grey).withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Icon(Icons.videocam_rounded, color: isOnline ? AppTheme.safeGreen : Colors.grey, size: 22),
-                    ),
-                    title: Text('${c['camera_id']} - ${c['name']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('Type: ${c['type']} • ${c['status'].toString().toUpperCase()}', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                    trailing: Container(
-                      width: 12, height: 12,
-                      decoration: BoxDecoration(
-                        color: isOnline ? AppTheme.safeGreen : Colors.grey,
-                        shape: BoxShape.circle,
-                        boxShadow: isOnline ? [BoxShadow(color: AppTheme.safeGreen.withValues(alpha: 0.4), blurRadius: 6)] : null,
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const Text('Unable to load camera data.'),
-          ),
-          const SizedBox(height: 24),
-
-          Row(
-            children: [
-              Icon(Icons.analytics_rounded, size: 20, color: AppTheme.forestGreen),
-              const SizedBox(width: 8),
-              const Text('Incident Summary (7d)', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          incReportAsync.when(
-            data: (inc) => Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
-              child: Column(
-                children: [
-                  _reportRow('Total Alerts', '${inc['total_alerts'] ?? 0}'),
-                  _reportRow('Active Danger Zones', '${inc['active_danger_zones'] ?? 0}'),
-                  _reportRow('Closed Alerts', '${inc['closed'] ?? 0}'),
-                  _reportRow('Rejected Alerts', '${inc['rejected'] ?? 0}'),
-                ],
-              ),
-            ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const SizedBox(),
-          ),
-          const SizedBox(height: 20),
-
-          Row(
-            children: [
-              Icon(Icons.pets_rounded, size: 20, color: AppTheme.approachingAmber),
-              const SizedBox(width: 8),
-              const Text('Wildlife Breakdown', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: 10),
-          detReportAsync.when(
-            data: (det) {
-              final list = det['by_animal'] as List<dynamic>? ?? [];
-              return Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppTheme.elevatedShadow,
-                ),
-                child: Column(
-                  children: list.map((a) {
-                    final animalName = AppConstants.animalNames[a['animal_type']] ?? a['animal_type'];
-                    final avgConf = (((a['avg_confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
-                    return _reportRow(
-                      '${AppConstants.animalEmojis[a['animal_type']] ?? '🐾'} $animalName',
-                      '${a['count']} detections (Avg: $avgConf%)',
-                    );
-                  }).toList(),
-                ),
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (_, __) => const SizedBox(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _reportRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-          Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-        ],
-      ),
-    );
+  Widget build(BuildContext context) {
+    return const CameraMonitoringScreen();
   }
 }
 
 // ═══════════════════════════════════════════════════
-// 5. RANGER PROFILE TAB
+// 5. PROFILE TAB (Matching Image 5: Elena Vance Profile & Support)
 // ═══════════════════════════════════════════════════
-class _RangerProfileTab extends StatelessWidget {
+class _RangerProfileTab extends StatefulWidget {
   final AuthState auth;
   final VoidCallback onLogout;
 
   const _RangerProfileTab({required this.auth, required this.onLogout});
 
   @override
+  State<_RangerProfileTab> createState() => _RangerProfileTabState();
+}
+
+class _RangerProfileTabState extends State<_RangerProfileTab> {
+  bool _showSettingsView = false;
+
+  @override
   Widget build(BuildContext context) {
+    if (_showSettingsView) {
+      return _RangerSettingsScreen(
+        onBack: () => setState(() => _showSettingsView = false),
+        onLogout: widget.onLogout,
+      );
+    }
+
+    final userName = widget.auth.user?['full_name'] ?? 'Elena Vance';
+    final userEmail = widget.auth.user?['email'] ?? 'elena.vance@example.com';
+
     return Scaffold(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        leading: const Row(
+          children: [
+            SizedBox(width: 16),
+            Icon(Icons.forest_rounded, color: AppTheme.primary, size: 24),
+            SizedBox(width: 8),
+            Text('ForestGuard', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.primary)),
+          ],
+        ),
+        leadingWidth: 200,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined, color: AppTheme.primary),
+            onPressed: () {},
+          ),
+        ],
+      ),
       body: ListView(
-        padding: EdgeInsets.zero,
+        padding: const EdgeInsets.all(20),
         children: [
-          // Gradient profile header
+          // Centered Profile Card with Pencil Edit Button (Image 5)
           Container(
-            width: double.infinity,
-            padding: EdgeInsets.only(
-              top: MediaQuery.of(context).padding.top + 16,
-              bottom: 28,
-              left: 24,
-              right: 24,
-            ),
-            decoration: const BoxDecoration(
-              gradient: AppTheme.rangerGradient,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(32),
-                bottomRight: Radius.circular(32),
-              ),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(24),
             ),
             child: Column(
               children: [
-                const Text('Ranger Profile', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
-                const SizedBox(height: 20),
-                Container(
-                  width: 72,
-                  height: 72,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(22),
-                    color: Colors.white.withValues(alpha: 0.15),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.25), width: 2),
-                  ),
-                  child: Center(
-                    child: Text(
-                      (auth.user?['full_name'] ?? 'R').substring(0, 1).toUpperCase(),
-                      style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: Colors.white),
+                Stack(
+                  children: [
+                    const CircleAvatar(
+                      radius: 46,
+                      backgroundImage: NetworkImage('https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80'),
                     ),
-                  ),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: const BoxDecoration(
+                          color: AppTheme.primary,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.edit, color: Colors.white, size: 14),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 14),
                 Text(
-                  auth.user?['full_name'] ?? 'Ranger Officer',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Colors.white),
+                  userName,
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppTheme.primary),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  'Badge: ${auth.user?['badge_number'] ?? "MWR-001"} • RANGER',
-                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.6)),
+                  userEmail,
+                  style: const TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  auth.user?['email'] ?? '',
-                  style: TextStyle(fontSize: 12, color: Colors.white.withValues(alpha: 0.5)),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5F7ED),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.location_on_outlined, size: 14, color: AppTheme.secondary),
+                          SizedBox(width: 4),
+                          Text('Expert Guide', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.secondary)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        children: [
+                          Icon(Icons.cabin_rounded, size: 14, color: AppTheme.onSurfaceVariant),
+                          SizedBox(width: 4),
+                          Text('14 Zones Visited', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.onSurfaceVariant)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 24),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
-              child: Column(
-                children: [
-                  _menuItem(Icons.security_rounded, 'Security Protocols', () {}),
-                  Divider(height: 1, indent: 56, color: Colors.grey.shade100),
-                  _menuItem(Icons.tune_rounded, 'Detection Threshold', () {}),
-                  Divider(height: 1, indent: 56, color: Colors.grey.shade100),
-                  _menuItem(Icons.info_outline_rounded, 'ForestGuard v1.0.0', () {}),
-                ],
-              ),
+          // Section 1: ACCOUNT SETTINGS (Image 5)
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'ACCOUNT SETTINGS',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.onSurfaceVariant, letterSpacing: 1),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                _buildProfileRow(
+                  icon: Icons.notifications_none_rounded,
+                  title: 'Notifications & Alert Preferences',
+                  subtitle: 'Manage wildlife and weather alerts',
+                  onTap: () {},
+                ),
+                const Divider(height: 1, indent: 60),
+                _buildProfileRow(
+                  icon: Icons.gps_fixed_rounded,
+                  title: 'Location Permissions & Privacy',
+                  subtitle: 'GPS tracking and data sharing',
+                  onTap: () {},
+                ),
+                const Divider(height: 1, indent: 60),
+                _buildProfileRow(
+                  icon: Icons.dark_mode_outlined,
+                  title: 'Dark Mode / Language',
+                  subtitle: 'System theme and locale',
+                  onTap: () => setState(() => _showSettingsView = true),
+                ),
+              ],
             ),
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppTheme.elevatedShadow,
-              ),
-              child: _menuItem(Icons.logout_rounded, 'Sign Out', onLogout, isDestructive: true),
+          // Section 2: SUPPORT (Image 5)
+          const Padding(
+            padding: EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              'SUPPORT',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.onSurfaceVariant, letterSpacing: 1),
+            ),
+          ),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                _buildProfileRow(
+                  icon: Icons.shield_outlined,
+                  title: 'Safety Center / Help',
+                  subtitle: 'Emergency protocols and FAQs',
+                  iconColor: const Color(0xFFFFDAD6),
+                  iconSymbolColor: const Color(0xFFBA1A1A),
+                  onTap: () {},
+                ),
+                const Divider(height: 1, indent: 60),
+                _buildProfileRow(
+                  icon: Icons.info_outline_rounded,
+                  title: 'About ForestGuard',
+                  subtitle: 'Version 2.4.1',
+                  onTap: () {},
+                ),
+              ],
             ),
           ),
 
           const SizedBox(height: 32),
+
+          // Red Outlined Logout Button (Image 5)
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: OutlinedButton.icon(
+              onPressed: widget.onLogout,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFBA1A1A),
+                side: const BorderSide(color: Color(0xFFBA1A1A), width: 1.5),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              icon: const Icon(Icons.logout_rounded, size: 18, color: Color(0xFFBA1A1A)),
+              label: const Text(
+                'Logout',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFBA1A1A)),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 30),
         ],
       ),
     );
   }
 
-  Widget _menuItem(IconData icon, String title, VoidCallback onTap, {bool isDestructive = false}) {
-    final color = isDestructive ? AppTheme.dangerRed : AppTheme.textPrimary;
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: (isDestructive ? AppTheme.dangerRed : AppTheme.rangerBlue).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, color: color, size: 20),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: color)),
-              ),
-              if (!isDestructive)
-                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400, size: 20),
-            ],
-          ),
+  Widget _buildProfileRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+    Color iconColor = const Color(0xFFE5F7ED),
+    Color iconSymbolColor = AppTheme.primary,
+  }) {
+    return ListTile(
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: iconColor,
+          shape: BoxShape.circle,
         ),
+        child: Icon(icon, color: iconSymbolColor, size: 20),
       ),
+      title: Text(title, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.onSurface)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.onSurfaceVariant, size: 20),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// 6. RANGER SETTINGS SCREEN (Matching Image 1: Settings)
+// ═══════════════════════════════════════════════════
+class _RangerSettingsScreen extends StatelessWidget {
+  final VoidCallback onBack;
+  final VoidCallback onLogout;
+
+  const _RangerSettingsScreen({required this.onBack, required this.onLogout});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: AppTheme.surface,
+      appBar: AppBar(
+        backgroundColor: AppTheme.surface,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded, color: AppTheme.primary),
+          onPressed: onBack,
+        ),
+        title: const Text(
+          'ForestGuard',
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 22, color: AppTheme.primary),
+        ),
+        centerTitle: true,
+        actions: [
+          Container(
+            margin: const EdgeInsets.only(right: 16),
+            width: 34,
+            height: 34,
+            decoration: const BoxDecoration(
+              color: AppTheme.surfaceContainerHigh,
+              shape: BoxShape.circle,
+            ),
+            child: const Center(
+              child: Text(
+                'RM',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.primary),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          // Title & Subtitle (Image 1)
+          const Text(
+            'Settings',
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w900,
+              color: AppTheme.primary,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Manage your ranger device preferences.',
+            style: TextStyle(fontSize: 14, color: AppTheme.onSurfaceVariant),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Main Card Container with 6 Mint Icon Settings Rows (Image 1)
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppTheme.outlineVariant.withValues(alpha: 0.3)),
+              boxShadow: AppTheme.ambientShadow,
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: [
+                _buildStitchSettingRow(
+                  icon: Icons.notifications_none_outlined,
+                  title: 'Notification Settings',
+                  subtitle: 'Push alerts & sounds',
+                ),
+                const Divider(height: 1, indent: 64),
+                _buildStitchSettingRow(
+                  icon: Icons.location_on_outlined,
+                  title: 'Location Settings',
+                  subtitle: 'GPS tracking & sharing',
+                ),
+                const Divider(height: 1, indent: 64),
+                _buildStitchSettingRow(
+                  icon: Icons.campaign_outlined,
+                  title: 'Alert Preferences',
+                  subtitle: 'Poacher & wildlife alerts',
+                ),
+                const Divider(height: 1, indent: 64),
+                _buildStitchSettingRow(
+                  icon: Icons.layers_outlined,
+                  title: 'Map Settings',
+                  subtitle: 'Terrain, layers & offline',
+                ),
+                const Divider(height: 1, indent: 64),
+                _buildStitchSettingRow(
+                  icon: Icons.camera_alt_outlined,
+                  title: 'Camera Settings',
+                  subtitle: 'Trap integration & capture',
+                ),
+                const Divider(height: 1, indent: 64),
+                _buildStitchSettingRow(
+                  icon: Icons.shield_outlined,
+                  title: 'Security',
+                  subtitle: 'Biometrics & passcode',
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // Red Outlined Log Out Device Button (Image 1)
+          Center(
+            child: SizedBox(
+              width: 180,
+              height: 48,
+              child: OutlinedButton(
+                onPressed: onLogout,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFBA1A1A),
+                  side: const BorderSide(color: Color(0xFFBA1A1A), width: 1.5),
+                  shape: const StadiumBorder(),
+                ),
+                child: const Text(
+                  'Log Out Device',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFFBA1A1A)),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 30),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStitchSettingRow({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      leading: Container(
+        width: 44,
+        height: 44,
+        decoration: const BoxDecoration(
+          color: Color(0xFFE5F7ED),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: AppTheme.primary, size: 22),
+      ),
+      title: Text(
+        title,
+        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.primary),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded, color: AppTheme.primary, size: 20),
+      onTap: () {},
     );
   }
 }
