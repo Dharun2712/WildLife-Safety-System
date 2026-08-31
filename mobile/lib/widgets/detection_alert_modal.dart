@@ -65,8 +65,7 @@ class DetectionAlertModal extends StatelessWidget {
         .toString()
         .toUpperCase();
 
-    final isVerified = verificationStatus == 'VERIFIED' || verificationStatus == 'ACTIVE';
-    final animalName = AppConstants.animalNames[animalType] ?? animalType.toUpperCase();
+    final animalName = AppConstants.animalNames[animalType] ?? animalType;
 
     final cameraId = detection['camera_id'] ?? 'C-01';
     final lat = (detection['latitude'] is num) ? (detection['latitude'] as num).toDouble() : 11.5690;

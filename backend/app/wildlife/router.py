@@ -130,6 +130,18 @@ async def create_detection(
     """
     now = datetime.now(timezone.utc)
     
+    # Normalize animal_type strictly to canonical names (tiger, elephant, lion, leopard, bear)
+    NORMALIZE_MAP = {
+        "bengal tiger": "tiger",
+        "asian elephant": "elephant",
+        "african lion": "lion",
+        "indian leopard": "leopard",
+        "sloth bear": "bear",
+        "sloth": "bear",
+    }
+    raw_type = payload.animal_type.lower().strip()
+    payload.animal_type = NORMALIZE_MAP.get(raw_type, raw_type)
+
     # Look up camera to get forest association
     camera = await db.cameras.find_one({"camera_id": payload.camera_id})
     forest_id = camera.get("forest_id") if camera else None
@@ -342,8 +354,8 @@ async def create_detection(
         {"$set": {"alert_id": alert_id, "danger_zone_id": danger_zone_id}}
     )
     
-    # Notify rangers of new detection
-    await ws_manager.broadcast_to_rangers("wildlife_detected", {
+    # Notify all connected clients (rangers & tourists) of new detection instantly
+    await ws_manager.broadcast_all("wildlife_detected", {
         "detection_id": str(detection_id),
         "alert_id": str(alert_id),
         "animal_type": payload.animal_type,

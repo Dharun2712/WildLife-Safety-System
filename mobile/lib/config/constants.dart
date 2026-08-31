@@ -40,10 +40,16 @@ class AppConstants {
   };
 
   static const Map<String, String> animalNames = {
-    'tiger': 'Tiger',
-    'elephant': 'Elephant',
-    'lion': 'Lion',
-    'leopard': 'Leopard',
-    'bear': 'Bear',
+    'tiger': 'tiger',
+    'elephant': 'elephant',
+    'lion': 'lion',
+    'leopard': 'leopard',
+    'bear': 'bear',
+    'bengal tiger': 'tiger',
+    'asian elephant': 'elephant',
+    'sloth bear': 'bear',
+    'sloth': 'bear',
+    'african lion': 'lion',
+    'indian leopard': 'leopard',
   };
 }

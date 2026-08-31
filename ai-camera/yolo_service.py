@@ -29,6 +29,7 @@ from config import (
     STRICT_EXCLUDE_CLASSES,
     TARGET_CLASSES,
     VERIFICATION_THRESHOLD,
+    normalize_animal_name,
 )
 
 logger = logging.getLogger("forestguard.yolo")
@@ -71,7 +72,7 @@ class Detection:
         longitude: float = CAMERA_LONGITUDE,
     ):
         self.id = str(uuid.uuid4())[:8]
-        self.animal_type = str(animal_type).lower()
+        self.animal_type = normalize_animal_name(animal_type)
         self.confidence = float(confidence)
         self.bbox = tuple(float(v) for v in bbox)  # (x_min, y_min, x_max, y_max)
         self.verification_status = verification_status

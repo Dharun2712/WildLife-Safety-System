@@ -5,11 +5,11 @@
  */
 
 const ANIMAL_CONFIGS = {
-    tiger: { name: 'Bengal Tiger', emoji: '🐯', color: '#f97316' },
-    elephant: { name: 'Asian Elephant', emoji: '🐘', color: '#00d2ff' },
-    lion: { name: 'Asiatic Lion', emoji: '🦁', color: '#ef4444' },
-    leopard: { name: 'Indian Leopard', emoji: '🐆', color: '#eab308' },
-    bear: { name: 'Sloth Bear', emoji: '🐻', color: '#94a3b8' },
+    tiger: { name: 'tiger', emoji: '', color: '#f97316' },
+    elephant: { name: 'elephant', emoji: '', color: '#00d2ff' },
+    lion: { name: 'lion', emoji: '', color: '#ef4444' },
+    leopard: { name: 'leopard', emoji: '', color: '#eab308' },
+    bear: { name: 'bear', emoji: '', color: '#94a3b8' },
 };
 
 // Global State

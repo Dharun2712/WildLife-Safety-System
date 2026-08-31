@@ -81,6 +81,26 @@ TARGET_CLASSES = {
 }
 ANIMAL_TYPES = ["tiger", "elephant", "lion", "leopard", "bear"]
 
+# Strict species name normalization dictionary
+NORMALIZE_ANIMAL_MAP = {
+    "tiger": "tiger",
+    "bengal tiger": "tiger",
+    "elephant": "elephant",
+    "asian elephant": "elephant",
+    "lion": "lion",
+    "african lion": "lion",
+    "leopard": "leopard",
+    "indian leopard": "leopard",
+    "bear": "bear",
+    "sloth bear": "bear",
+    "sloth": "bear",
+}
+
+def normalize_animal_name(name: str) -> str:
+    """Normalize any animal label to one of the 5 canonical names: tiger, elephant, lion, leopard, bear."""
+    n = str(name).lower().strip()
+    return NORMALIZE_ANIMAL_MAP.get(n, n)
+
 # ─── COCO Fallback Mapping (Pretrained Model) ──────────────────────
 # Used ONLY when running generic yolov8n.pt / yolo11n.pt pretrained on COCO.
 # ONLY direct wild animal matches (elephant=20, bear=21) are mapped to avoid false alarms
