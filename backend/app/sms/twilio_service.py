@@ -106,7 +106,9 @@ class TwilioSMSService:
 
         sent = 0
         failed = 0
-        from_number = self._format_phone(settings.TWILIO_FROM_NUMBER)
+        from_number = settings.TWILIO_FROM_NUMBER.strip()
+        if not from_number.startswith("+"):
+            from_number = f"+{from_number}"
 
         for phone in phone_numbers:
             try:
