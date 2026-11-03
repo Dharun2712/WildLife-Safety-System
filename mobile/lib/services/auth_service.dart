@@ -22,6 +22,7 @@ class AuthService {
     required String password,
     required String fullName,
     String? phone,
+    List<String>? emergencyContacts,
   }) async {
     final response = await _api.dio.post('/api/auth/register', data: {
       'username': username,
@@ -30,6 +31,8 @@ class AuthService {
       'full_name': fullName,
       'role': 'tourist',
       if (phone != null) 'phone': phone,
+      if (emergencyContacts != null && emergencyContacts.isNotEmpty)
+        'emergency_contacts': emergencyContacts,
     });
 
     final data = response.data as Map<String, dynamic>;

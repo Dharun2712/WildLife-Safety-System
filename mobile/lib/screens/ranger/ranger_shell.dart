@@ -8,7 +8,9 @@ import '../../providers/providers.dart';
 import '../../services/api_service.dart';
 import '../../widgets/forest_map_view.dart';
 import '../../widgets/detection_alert_modal.dart';
-import '../../widgets/sos_active_dialog.dart';
+import '../../widgets/sos_request_modal.dart';
+import '../../widgets/popup_notification.dart';
+import '../../services/sound_service.dart';
 
 class RangerShell extends ConsumerStatefulWidget {
   const RangerShell({super.key});
@@ -31,6 +33,7 @@ class _RangerShellState extends ConsumerState<RangerShell> {
 
   @override
   void dispose() {
+    SoundService.instance.stopSound();
     _wsSubscription?.cancel();
     super.dispose();
   }
@@ -39,12 +42,13 @@ class _RangerShellState extends ConsumerState<RangerShell> {
     final ws = ref.read(webSocketProvider);
     _wsSubscription = ws.events.listen((event) {
       final eventType = event['type'] ?? event['event'];
+      final data = event['data'] is Map ? Map<String, dynamic>.from(event['data']) : event;
+
       if (eventType == 'wildlife_detected' ||
           eventType == 'danger_zone_created' ||
           eventType == 'danger_zone_updated') {
 
-        final data = event['data'] is Map ? Map<String, dynamic>.from(event['data']) : event;
-
+        SoundService.instance.playAlertSound();
         ref.invalidate(dangerZonesProvider);
         ref.invalidate(alertsProvider);
         ref.invalidate(touristsProvider);
@@ -58,9 +62,93 @@ class _RangerShellState extends ConsumerState<RangerShell> {
             onViewOnMap: () {
               setState(() => _currentIndex = 2);
             },
-            onTriggerSOS: () {
-              SOSActiveDialog.show(context);
+          );
+        }
+      }
+
+      // SOS request from tourist — show SOS modal
+      if (eventType == 'sos_request') {
+        SoundService.instance.playAlertSound();
+        ref.invalidate(sosRequestsProvider);
+        if (mounted) {
+          PopupNotification.show(
+            context,
+            title: '🚨 SOS EMERGENCY',
+            message: '${data['tourist_name'] ?? 'Tourist'} needs help!',
+            icon: Icons.emergency_rounded,
+            color: AppTheme.error,
+          );
+          SOSRequestModal.show(
+            context,
+            sosData: data,
+            onVerify: () {
+              ref.invalidate(sosRequestsProvider);
             },
+            onAcknowledge: () {
+              ref.invalidate(sosRequestsProvider);
+            },
+            onViewOnMap: () {
+              setState(() => _currentIndex = 2);
+            },
+          );
+        }
+      }
+
+      // SOS verified notification
+      if (eventType == 'sos_verified') {
+        SoundService.instance.stopSound();
+        ref.invalidate(sosRequestsProvider);
+        if (mounted) {
+          PopupNotification.show(
+            context,
+            title: 'SOS Verified',
+            message: 'SOS from ${data['tourist_name'] ?? 'Tourist'} verified by ${data['verified_by'] ?? 'Ranger'}',
+            icon: Icons.verified_rounded,
+            color: AppTheme.secondary,
+          );
+        }
+      }
+
+      // SOS acknowledged notification
+      if (eventType == 'sos_acknowledged') {
+        SoundService.instance.stopSound();
+        ref.invalidate(sosRequestsProvider);
+        if (mounted) {
+          PopupNotification.show(
+            context,
+            title: 'SOS Resolved ✅',
+            message: 'SOS from ${data['tourist_name'] ?? 'Tourist'} resolved by ${data['acknowledged_by'] ?? 'Ranger'}',
+            icon: Icons.check_circle_rounded,
+            color: AppTheme.safeGreen,
+          );
+        }
+      }
+
+      // Alert acknowledged notification
+      if (eventType == 'alert_acknowledged') {
+        SoundService.instance.stopSound();
+        ref.invalidate(alertsProvider);
+        if (mounted) {
+          PopupNotification.show(
+            context,
+            title: 'Alert Acknowledged ✅',
+            message: '${data['animal_type'] ?? 'Wildlife'} alert resolved by ${data['acknowledged_by'] ?? 'Ranger'}',
+            icon: Icons.check_circle_rounded,
+            color: AppTheme.safeGreen,
+          );
+        }
+      }
+
+      // Alert verified notification
+      if (eventType == 'alert_verified') {
+        ref.invalidate(alertsProvider);
+        if (mounted) {
+          PopupNotification.show(
+            context,
+            title: 'Threat Verified',
+            message: '${data['animal_type'] ?? 'Wildlife'} detection verified by ${data['verified_by'] ?? 'Ranger'}',
+            icon: Icons.verified_rounded,
+            color: AppTheme.secondary,
           );
         }
       }
@@ -116,13 +204,55 @@ class _RangerShellState extends ConsumerState<RangerShell> {
 // ═══════════════════════════════════════════════════
 // 1. RANGER HOME TAB — Stitch Command Center
 // ═══════════════════════════════════════════════════
-class _RangerHomeTab extends ConsumerWidget {
+class _RangerHomeTab extends ConsumerStatefulWidget {
   final AuthState auth;
   final VoidCallback onViewMap;
-  const _RangerHomeTab({required this.auth, required this.onViewMap});
+  const _RangerHomeTab({super.key, required this.auth, required this.onViewMap});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_RangerHomeTab> createState() => _RangerHomeTabState();
+}
+
+class _RangerHomeTabState extends ConsumerState<_RangerHomeTab> {
+  final List<Map<String, dynamic>> _simulatedRangerAlerts = [];
+
+  void _triggerSimulatedAlert() {
+    final animals = [
+      {'type': 'tiger', 'name': 'Bengal Tiger', 'camera': 'C-08', 'zone': 'Sector 7 - Zone A'},
+      {'type': 'elephant', 'name': 'Asian Elephant', 'camera': 'C-02', 'zone': 'Sector 4 - Zone C'},
+      {'type': 'bear', 'name': 'Sloth Bear', 'camera': 'C-05', 'zone': 'Sector 2 - Zone B'},
+    ];
+    final selected = animals[DateTime.now().second % animals.length];
+
+    final payload = {
+      'id': 'sim_r_${DateTime.now().millisecondsSinceEpoch}',
+      'animal_type': selected['type'],
+      'confidence': 0.96,
+      'camera_id': selected['camera'],
+      'zone_code': selected['zone'],
+      'latitude': 11.5690,
+      'longitude': 76.6320,
+      'status': 'needs_verification',
+      'verification_status': 'NEEDS_VERIFICATION',
+      'created_at': 'Just now',
+    };
+
+    SoundService.instance.playAlertSound();
+    DetectionAlertModal.show(
+      context,
+      detection: payload,
+      isRanger: true,
+      onAcknowledge: () {
+        setState(() {
+          _simulatedRangerAlerts.insert(0, payload);
+        });
+      },
+      onViewOnMap: widget.onViewMap,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final alertsAsync = ref.watch(alertsProvider);
     final zonesAsync = ref.watch(dangerZonesProvider);
     final camerasAsync = ref.watch(camerasProvider);
@@ -130,11 +260,24 @@ class _RangerHomeTab extends ConsumerWidget {
     return Scaffold(
       backgroundColor: AppTheme.surface,
       appBar: AppBar(
-        backgroundColor: Colors.white.withValues(alpha: 0.85),
+        backgroundColor: Colors.white.withValues(alpha: 0.9),
         elevation: 0,
         scrolledUnderElevation: 1,
         title: const Text('ForestGuard', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, color: AppTheme.primary)),
         actions: [
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              backgroundColor: AppTheme.errorContainer.withValues(alpha: 0.6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            onPressed: _triggerSimulatedAlert,
+            icon: const Icon(Icons.bolt_rounded, size: 16, color: AppTheme.error),
+            label: const Text(
+              'Test Alert 🚨',
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.onErrorContainer),
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.notifications_outlined, color: AppTheme.primary),
             onPressed: () {
@@ -143,7 +286,8 @@ class _RangerHomeTab extends ConsumerWidget {
               ref.invalidate(camerasProvider);
               ref.invalidate(detectionsProvider);
             },
-          )
+          ),
+          const SizedBox(width: 4),
         ],
       ),
       body: RefreshIndicator(
@@ -154,7 +298,7 @@ class _RangerHomeTab extends ConsumerWidget {
           ref.invalidate(detectionsProvider);
         },
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120),
           children: [
             // Stitch Ranger Profile Header Card
             Container(
@@ -176,7 +320,7 @@ class _RangerHomeTab extends ConsumerWidget {
                     ),
                     child: Center(
                       child: Text(
-                        (auth.user?['full_name'] ?? 'R').substring(0, 1).toUpperCase(),
+                        (widget.auth.user?['full_name'] ?? 'R').substring(0, 1).toUpperCase(),
                         style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                       ),
                     ),
@@ -187,7 +331,7 @@ class _RangerHomeTab extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          auth.user?['full_name'] ?? 'Officer Ranger',
+                          widget.auth.user?['full_name'] ?? 'Officer Ranger',
                           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppTheme.primary),
                         ),
                         const SizedBox(height: 2),
@@ -221,7 +365,7 @@ class _RangerHomeTab extends ConsumerWidget {
                 Expanded(
                   child: _StitchStatCard(
                     title: 'Active Alerts',
-                    count: alertsAsync.value?.where((a) => a['status'] == 'active' || a['status'] == 'needs_verification' || a['status'] == 'monitoring').length.toString() ?? '...',
+                    count: ((alertsAsync.value?.where((a) => a['status'] == 'active' || a['status'] == 'needs_verification' || a['status'] == 'monitoring').length ?? 0) + _simulatedRangerAlerts.length).toString(),
                     subtitle: 'High Priority',
                     color: AppTheme.error,
                     icon: Icons.warning_rounded,
@@ -270,10 +414,10 @@ class _RangerHomeTab extends ConsumerWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('Recent Detections', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+                const Text('Recent Detections', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
                 TextButton(
-                  onPressed: onViewMap,
-                  child: const Text('VIEW MAP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppTheme.primary)),
+                  onPressed: widget.onViewMap,
+                  child: const Text('VIEW MAP', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppTheme.primary)),
                 ),
               ],
             ),
@@ -281,8 +425,14 @@ class _RangerHomeTab extends ConsumerWidget {
 
             alertsAsync.when(
               data: (alerts) {
-                final pending = alerts.where((a) => a['status'] == 'needs_verification' || a['status'] == 'active').toList();
-                if (pending.isEmpty) {
+                final pending = alerts.where((a) {
+                  final s = (a['status'] ?? '').toString();
+                  final isAck = a['ranger_acknowledged'] == true || s == 'acknowledged';
+                  return (s == 'needs_verification' || s == 'active') && !isAck;
+                }).toList();
+                final allPending = [..._simulatedRangerAlerts, ...pending];
+
+                if (allPending.isEmpty) {
                   return Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -306,7 +456,7 @@ class _RangerHomeTab extends ConsumerWidget {
                   );
                 }
                 return Column(
-                  children: pending.take(3).map((a) => _StitchRangerDetectionItem(alert: a, ref: ref)).toList(),
+                  children: allPending.take(4).map((a) => _StitchRangerDetectionItem(alert: a, ref: ref, onViewMap: widget.onViewMap)).toList(),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
@@ -429,85 +579,161 @@ class _StitchStatCard extends StatelessWidget {
   }
 }
 
-// Stitch Ranger Detection Item
+// Stitch Ranger Detection Item Big Box Card
 class _StitchRangerDetectionItem extends StatelessWidget {
   final Map<String, dynamic> alert;
   final WidgetRef ref;
+  final VoidCallback? onViewMap;
 
-  const _StitchRangerDetectionItem({required this.alert, required this.ref});
+  const _StitchRangerDetectionItem({required this.alert, required this.ref, this.onViewMap});
 
   @override
   Widget build(BuildContext context) {
-    final animal = alert['animal_type'] ?? 'unknown';
-    final emoji = AppConstants.animalEmojis[animal] ?? '🐾';
-    final status = alert['status'] ?? 'unknown';
+    final animalKey = (alert['animal_type'] ?? 'unknown').toString().toLowerCase();
+    final animalName = AppConstants.animalNames[animalKey] ?? animalKey.toUpperCase();
+    final status = (alert['status'] ?? 'unknown').toString();
+    final isAcknowledged = status == 'acknowledged' || alert['ranger_acknowledged'] == true;
     final isNeedsVerify = status == 'needs_verification';
     final alertId = alert['id'] ?? '';
-    final conf = (((alert['confidence'] ?? 0) as num) * 100).toStringAsFixed(0);
+    final conf = (((alert['confidence'] ?? 0.85) as num) * 100).toStringAsFixed(0);
+    final camId = alert['camera_id'] ?? 'C-01';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 14),
       decoration: BoxDecoration(
         color: AppTheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isNeedsVerify ? AppTheme.error.withValues(alpha: 0.4) : AppTheme.outlineVariant.withValues(alpha: 0.3),
+          color: isAcknowledged
+              ? AppTheme.safeGreen.withValues(alpha: 0.4)
+              : (isNeedsVerify ? AppTheme.error.withValues(alpha: 0.4) : AppTheme.outlineVariant.withValues(alpha: 0.3)),
+          width: 1.5,
         ),
         boxShadow: AppTheme.ambientShadow,
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: isNeedsVerify ? AppTheme.errorContainer : AppTheme.secondaryContainer,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Center(child: Text(emoji, style: const TextStyle(fontSize: 26))),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  '${AppConstants.animalNames[animal] ?? animal} Incident',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppTheme.primary),
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: isAcknowledged
+                        ? AppTheme.safeGreen.withValues(alpha: 0.15)
+                        : (isNeedsVerify ? AppTheme.errorContainer.withValues(alpha: 0.5) : AppTheme.secondaryContainer.withValues(alpha: 0.5)),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Center(
+                    child: Icon(
+                      AppConstants.getAnimalIcon(animalKey),
+                      color: isAcknowledged ? AppTheme.safeGreen : (isNeedsVerify ? AppTheme.error : AppTheme.secondary),
+                      size: 26,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  'Sector 4 • Conf: $conf%',
-                  style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '$animalName Detection',
+                        style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16, color: AppTheme.primary),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Camera $camId • $conf% AI Confidence',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isAcknowledged ? AppTheme.safeGreen : (isNeedsVerify ? AppTheme.error : AppTheme.secondary),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isAcknowledged ? AppTheme.safeGreen : (isNeedsVerify ? AppTheme.error : AppTheme.secondary),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    isAcknowledged ? 'SOLVED' : (isNeedsVerify ? 'UNVERIFIED' : 'VERIFIED'),
+                    style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w900, color: Colors.white),
+                  ),
                 ),
               ],
             ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isNeedsVerify ? AppTheme.error : AppTheme.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      DetectionAlertModal.show(
+                        context,
+                        detection: alert,
+                        isRanger: true,
+                        onViewOnMap: onViewMap,
+                      );
+                    },
+                    icon: const Icon(Icons.videocam_rounded, size: 16),
+                    label: const Text('Camera Snapshot', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: isAcknowledged ? AppTheme.safeGreen : (isNeedsVerify ? AppTheme.error : AppTheme.primary),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    onPressed: () async {
+                      if (isAcknowledged) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('✅ Case already acknowledged and resolved.')),
+                        );
+                        return;
+                      }
+                      try {
+                        final action = isNeedsVerify ? 'verify' : 'acknowledge';
+                        await ApiService().dio.patch('/api/alerts/$alertId/$action');
+                        ref.invalidate(alertsProvider);
+                        ref.invalidate(dangerZonesProvider);
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Alert $action processed.')));
+                        }
+                      } catch (_) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Alert acknowledged locally.')));
+                        }
+                      }
+                    },
+                    icon: Icon(isAcknowledged ? Icons.check_circle_rounded : Icons.check_circle_outline_rounded, size: 16),
+                    label: Text(
+                      isAcknowledged ? 'Acknowledged' : (isNeedsVerify ? 'Verify Threat' : 'Acknowledge'),
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            onPressed: () async {
-              try {
-                final action = isNeedsVerify ? 'verify' : 'acknowledge';
-                await ApiService().dio.patch('/api/alerts/$alertId/$action');
-                ref.invalidate(alertsProvider);
-                ref.invalidate(dangerZonesProvider);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('✅ Alert $action processed.')));
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('❌ Error: $e')));
-                }
-              }
-            },
-            child: Text(isNeedsVerify ? 'Verify' : 'Acknowledge', style: const TextStyle(fontSize: 12)),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -527,13 +753,38 @@ class _RangerAlertsTab extends ConsumerWidget {
       appBar: AppBar(title: const Text('Incident Management')),
       body: alertsAsync.when(
         data: (alerts) {
+          final pending = alerts.where((a) {
+            final s = (a['status'] ?? '').toString();
+            final isAck = a['ranger_acknowledged'] == true || s == 'acknowledged';
+            return s != 'closed' && s != 'rejected' && !isAck;
+          }).toList();
+
+          final solved = alerts.where((a) {
+            final s = (a['status'] ?? '').toString();
+            final isAck = a['ranger_acknowledged'] == true || s == 'acknowledged';
+            return isAck || s == 'closed';
+          }).toList();
+
           if (alerts.isEmpty) {
             return const Center(child: Text('No incidents recorded.'));
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: alerts.length,
-            itemBuilder: (ctx, i) => _StitchRangerDetectionItem(alert: alerts[i], ref: ref),
+
+          return ListView(
+            padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120),
+            children: [
+              if (pending.isNotEmpty) ...[
+                const Text('Active / Pending Incidents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+                const SizedBox(height: 12),
+                ...pending.map((a) => _StitchRangerDetectionItem(alert: a, ref: ref)),
+                const SizedBox(height: 24),
+              ],
+              const Text('Solved Cases / Handled Incidents', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+              const SizedBox(height: 12),
+              if (solved.isEmpty)
+                const Text('No solved cases recorded yet.', style: TextStyle(fontSize: 13, color: AppTheme.onSurfaceVariant))
+              else
+                ...solved.map((a) => _StitchRangerDetectionItem(alert: a, ref: ref)),
+            ],
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),

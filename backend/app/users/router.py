@@ -24,6 +24,7 @@ async def get_profile(current_user: dict = Depends(get_current_user)):
         full_name=current_user["full_name"],
         phone=current_user.get("phone"),
         role=current_user["role"],
+        emergency_contacts=current_user.get("emergency_contacts", []),
         is_active=current_user["is_active"],
         created_at=current_user.get("created_at"),
     )
@@ -60,6 +61,7 @@ async def update_profile(
         full_name=updated_user["full_name"],
         phone=updated_user.get("phone"),
         role=updated_user["role"],
+        emergency_contacts=updated_user.get("emergency_contacts", []),
         is_active=updated_user["is_active"],
         created_at=updated_user.get("created_at"),
     )

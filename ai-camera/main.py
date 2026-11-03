@@ -204,6 +204,14 @@ async def serve_js():
     return Response(content="", media_type="application/javascript")
 
 
+@app.get("/alert.mp3")
+async def serve_alert_sound():
+    sound_path = WEB_DIR / "alert.mp3"
+    if sound_path.exists():
+        return FileResponse(sound_path, media_type="audio/mpeg")
+    return Response(status_code=404)
+
+
 # --- Video Streaming Deck ---
 
 def generate_video_frames():

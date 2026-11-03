@@ -31,6 +31,11 @@ class Settings(BaseSettings):
     # Detection
     DEFAULT_CONFIDENCE_THRESHOLD: float = 0.70
 
+    # Twilio SMS
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_FROM_NUMBER: str = ""
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins from JSON string."""

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../config/constants.dart';
 import '../config/theme.dart';
+import '../services/sound_service.dart';
 
 /// ForestGuard - Proximity Warning & Detection Alert Modal
 /// Ranger mode: Shows camera image snapshot.
@@ -29,6 +30,7 @@ class DetectionAlertModal extends StatelessWidget {
     VoidCallback? onTriggerSOS,
     bool isRanger = false,
   }) {
+    SoundService.instance.playAlertSound();
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -65,6 +67,7 @@ class DetectionAlertModal extends StatelessWidget {
         .toString()
         .toUpperCase();
 
+    final isVerified = verificationStatus == 'VERIFIED' || verificationStatus == 'ACTIVE';
     final animalName = AppConstants.animalNames[animalType] ?? animalType;
 
     final cameraId = detection['camera_id'] ?? 'C-01';
@@ -165,14 +168,17 @@ class DetectionAlertModal extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
-                          '$animalName Detected',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
+                        Icon(AppConstants.getAnimalIcon(animalType), color: isVerified ? AppTheme.error : AppTheme.tertiaryFixedDim, size: 24),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$animalName Detected',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
                           ),
                         ),
                         Container(
@@ -267,24 +273,26 @@ class DetectionAlertModal extends StatelessWidget {
               // Action Buttons
               Column(
                 children: [
+                  // Primary Button: Go to Dashboard Active Alert
                   SizedBox(
                     width: double.infinity,
-                    height: 48,
+                    height: 50,
                     child: ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: AppTheme.error,
-                        foregroundColor: Colors.white,
+                        backgroundColor: const Color(0xFF22C55E),
+                        foregroundColor: Colors.black,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        elevation: 4,
+                        elevation: 6,
                       ),
                       onPressed: () {
+                        SoundService.instance.stopSound();
                         Navigator.of(context).pop();
-                        if (onTriggerSOS != null) onTriggerSOS!();
+                        if (onAcknowledge != null) onAcknowledge!();
                       },
-                      icon: const Icon(Icons.sos_rounded, size: 22),
+                      icon: const Icon(Icons.dashboard_customize_rounded, size: 20, color: Colors.black),
                       label: const Text(
-                        'TRIGGER EMERGENCY SOS',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                        'VIEW ON DASHBOARD (ACTIVE)',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 0.5),
                       ),
                     ),
                   ),
@@ -305,24 +313,25 @@ class DetectionAlertModal extends StatelessWidget {
                             if (onViewOnMap != null) onViewOnMap!();
                           },
                           icon: const Icon(Icons.map_rounded, size: 16),
-                          label: const Text('View Map', style: TextStyle(fontSize: 13)),
+                          label: const Text('View Map', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.white70,
-                            side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+                            foregroundColor: AppTheme.error,
+                            side: const BorderSide(color: AppTheme.error, width: 1.5),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: () {
+                            SoundService.instance.playAlertSound();
                             Navigator.of(context).pop();
-                            if (onAcknowledge != null) onAcknowledge!();
+                            if (onTriggerSOS != null) onTriggerSOS!();
                           },
-                          icon: const Icon(Icons.check_rounded, size: 16),
-                          label: Text(isRanger ? 'Verify Alert' : 'Dismiss', style: const TextStyle(fontSize: 13)),
+                          icon: const Icon(Icons.sos_rounded, size: 16),
+                          label: const Text('Trigger SOS', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
                         ),
                       ),
                     ],

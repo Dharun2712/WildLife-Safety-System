@@ -70,6 +70,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String password,
     required String fullName,
     String? phone,
+    List<String>? emergencyContacts,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
@@ -79,6 +80,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         password: password,
         fullName: fullName,
         phone: phone,
+        emergencyContacts: emergencyContacts,
       );
       final user = data['user'] as Map<String, dynamic>;
       _wsService.connect(data['access_token']);
@@ -105,13 +107,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final token = await _authService.getToken();
       if (token != null) {
-        final profile = await _authService.getProfile();
+        final profile = await _authService
+            .getProfile()
+            .timeout(const Duration(milliseconds: 2500));
         _wsService.connect(token);
         state = AuthState(
           isAuthenticated: true,
           role: profile['role'],
           user: profile,
         );
+      } else {
+        state = const AuthState();
       }
     } catch (_) {
       state = const AuthState();
@@ -194,3 +200,14 @@ final touristsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>(
     return [];
   }
 });
+
+// SOS requests provider
+final sosRequestsProvider = FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+  try {
+    final response = await ApiService().dio.get('/api/sos');
+    return List<Map<String, dynamic>>.from(response.data);
+  } catch (_) {
+    return [];
+  }
+});
+

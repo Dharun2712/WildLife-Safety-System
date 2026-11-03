@@ -58,6 +58,18 @@ async def register(request: RegisterRequest, db: AsyncIOMotorDatabase = Depends(
 
     # Create user document
     now = datetime.now(timezone.utc)
+    contacts = []
+    if request.emergency_contacts:
+        for c in request.emergency_contacts:
+            if isinstance(c, str):
+                c_clean = c.strip()
+                if c_clean and c_clean not in contacts:
+                    contacts.append(c_clean)
+            elif hasattr(c, "phone"):
+                c_clean = c.phone.strip()
+                if c_clean and c_clean not in contacts:
+                    contacts.append(c_clean)
+
     user_doc = {
         "username": request.username,
         "email": request.email,
@@ -65,6 +77,7 @@ async def register(request: RegisterRequest, db: AsyncIOMotorDatabase = Depends(
         "full_name": request.full_name,
         "phone": request.phone,
         "role": request.role.value,
+        "emergency_contacts": contacts,
         "is_active": True,
         "created_at": now,
         "updated_at": now,
@@ -90,6 +103,7 @@ async def register(request: RegisterRequest, db: AsyncIOMotorDatabase = Depends(
             full_name=user_doc["full_name"],
             phone=user_doc.get("phone"),
             role=user_doc["role"],
+            emergency_contacts=user_doc.get("emergency_contacts", []),
             is_active=user_doc["is_active"],
             created_at=user_doc["created_at"],
         ),
@@ -134,6 +148,7 @@ async def login(request: LoginRequest, db: AsyncIOMotorDatabase = Depends(get_da
             full_name=user["full_name"],
             phone=user.get("phone"),
             role=user["role"],
+            emergency_contacts=user.get("emergency_contacts", []),
             is_active=user["is_active"],
             created_at=user.get("created_at"),
         ),
@@ -178,6 +193,7 @@ async def refresh_token(
             full_name=user["full_name"],
             phone=user.get("phone"),
             role=user["role"],
+            emergency_contacts=user.get("emergency_contacts", []),
             is_active=user["is_active"],
             created_at=user.get("created_at"),
         ),

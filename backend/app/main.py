@@ -97,6 +97,7 @@ from app.tourists.router import router as tourists_router
 from app.notifications.router import router as notifications_router
 from app.cameras.router import router as cameras_router
 from app.reports.router import router as reports_router
+from app.sos.router import router as sos_router
 from app.websocket.router import router as websocket_router
 
 app.include_router(auth_router)
@@ -109,6 +110,7 @@ app.include_router(tourists_router)
 app.include_router(notifications_router)
 app.include_router(cameras_router)
 app.include_router(reports_router)
+app.include_router(sos_router)
 app.include_router(websocket_router)
 
 

@@ -12,3 +12,4 @@ python-multipart>=0.0.18
 python-dotenv>=1.0.1
 websockets>=13.0
 httpx>=0.28.0
+twilio>=8.11.0

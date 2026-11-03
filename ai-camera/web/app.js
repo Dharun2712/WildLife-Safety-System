@@ -32,56 +32,65 @@ function initAudioContext() {
     }
 }
 
-function playWildlifeAlertChime(animalType) {
-    if (!isSoundAlertEnabled) return;
-    const nowMs = Date.now();
-    // 0.6s debounce to prevent audio overlap while allowing rapid subsequent alerts
-    if (nowMs - lastAudioAlertTime < 600) return;
-    lastAudioAlertTime = nowMs;
+let alertAudioElement = null;
+let alertAudioStopTimer = null;
 
+function playSynthChime(animalType) {
     try {
         initAudioContext();
         if (!audioContext) return;
-
         if (audioContext.state === 'suspended') {
             audioContext.resume();
         }
-
         const now = audioContext.currentTime;
-
-        // Tone 1: High Alert Pulse
         const osc1 = audioContext.createOscillator();
         const gain1 = audioContext.createGain();
         osc1.type = 'sawtooth';
-
         const baseFreq = animalType === 'tiger' || animalType === 'lion' ? 950 : 850;
         osc1.frequency.setValueAtTime(baseFreq, now);
         osc1.frequency.exponentialRampToValueAtTime(baseFreq + 350, now + 0.15);
-
         gain1.gain.setValueAtTime(0.3, now);
         gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
-
         osc1.connect(gain1);
         gain1.connect(audioContext.destination);
         osc1.start(now);
         osc1.stop(now + 0.22);
-
-        // Tone 2: Futuristic Sine Chime
-        const osc2 = audioContext.createOscillator();
-        const gain2 = audioContext.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(1400, now + 0.16);
-        osc2.frequency.exponentialRampToValueAtTime(1780, now + 0.38);
-
-        gain2.gain.setValueAtTime(0.35, now + 0.16);
-        gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-
-        osc2.connect(gain2);
-        gain2.connect(audioContext.destination);
-        osc2.start(now + 0.16);
-        osc2.stop(now + 0.45);
     } catch (e) {
-        console.warn('Audio chime error:', e);
+        console.warn('Synth error:', e);
+    }
+}
+
+function stopWildlifeAlertAudio() {
+    if (alertAudioElement) {
+        alertAudioElement.pause();
+        alertAudioElement.currentTime = 0;
+    }
+    if (navigator.vibrate) {
+        navigator.vibrate(0);
+    }
+}
+
+function playWildlifeAlertChime(animalType) {
+    if (!isSoundAlertEnabled) return;
+
+    try {
+        if (!alertAudioElement) {
+            alertAudioElement = new Audio('/alert.mp3');
+        }
+        alertAudioElement.currentTime = 0;
+        alertAudioElement.loop = true;
+        alertAudioElement.play().catch(e => {
+            console.warn('Audio play error, falling back to synth chime:', e);
+            playSynthChime(animalType);
+        });
+
+        // Vibrate mobile device if browser supports Web Vibration API
+        if (navigator.vibrate) {
+            navigator.vibrate([500, 250, 500, 250, 500, 250]);
+        }
+    } catch (e) {
+        console.warn('Audio alert error:', e);
+        playSynthChime(animalType);
     }
 }
 
@@ -101,6 +110,13 @@ function toggleSoundAlert() {
             btn.className = 'icon-action-btn sound-muted';
             icon.textContent = '🔇';
             label.textContent = 'Muted';
+            if (alertAudioElement) {
+                alertAudioElement.pause();
+                alertAudioElement.currentTime = 0;
+            }
+            if (alertAudioStopTimer) {
+                clearTimeout(alertAudioStopTimer);
+            }
         }
     }
 }
@@ -303,6 +319,14 @@ function showFloatingThreatToast(incident) {
             <div class="toast-status-pill">⚡ Dispatched to Rangers & Tourists</div>
         </div>
     `;
+
+    toast.style.cursor = 'pointer';
+    toast.title = 'Click to accept/dismiss threat & stop alarm';
+    toast.onclick = () => {
+        stopWildlifeAlertAudio();
+        toast.remove();
+        displayedToastIds.delete(toastId);
+    };
 
     container.prepend(toast);
 

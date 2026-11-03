@@ -19,6 +19,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   final _fullNameCtl = TextEditingController();
   final _passwordCtl = TextEditingController();
   final _phoneCtl = TextEditingController();
+  int _contactCount = 1;
+  final List<TextEditingController> _contactControllers = [
+    TextEditingController(text: '7539965565'),
+  ];
   bool _obscure = true;
   late AnimationController _animController;
 
@@ -31,6 +35,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     )..forward();
   }
 
+  void _updateContactCount(int newCount) {
+    setState(() {
+      _contactCount = newCount;
+      while (_contactControllers.length < newCount) {
+        _contactControllers.add(TextEditingController());
+      }
+      while (_contactControllers.length > newCount) {
+        _contactControllers.removeLast().dispose();
+      }
+    });
+  }
+
   @override
   void dispose() {
     _usernameCtl.dispose();
@@ -38,6 +54,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
     _fullNameCtl.dispose();
     _passwordCtl.dispose();
     _phoneCtl.dispose();
+    for (final ctl in _contactControllers) {
+      ctl.dispose();
+    }
     _animController.dispose();
     super.dispose();
   }
@@ -45,12 +64,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final contacts = _contactControllers
+        .map((c) => c.text.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
     final success = await ref.read(authProvider.notifier).register(
       username: _usernameCtl.text.trim(),
       email: _emailCtl.text.trim(),
       password: _passwordCtl.text,
       fullName: _fullNameCtl.text.trim(),
       phone: _phoneCtl.text.trim().isNotEmpty ? _phoneCtl.text.trim() : null,
+      emergencyContacts: contacts.isNotEmpty ? contacts : null,
     );
 
     if (!mounted) return;
@@ -235,6 +260,133 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen>
                             hintText: '+91 XXXXXXXXXX',
                             hintStyle: TextStyle(color: Colors.grey.shade400),
                             prefixIcon: Icon(Icons.phone_outlined, color: AppTheme.forestGreen.withValues(alpha: 0.6)),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Emergency Contacts Section
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey.shade200),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.dangerRed.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(Icons.emergency_rounded, color: AppTheme.dangerRed, size: 20),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Emergency Contacts',
+                                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+                                        ),
+                                        Text(
+                                          'Automated Twilio SMS safety alerts sent here',
+                                          style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              Row(
+                                children: [
+                                  Text(
+                                    'Number of People:',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.grey.shade700),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF0FDF4),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: AppTheme.forestGreen.withValues(alpha: 0.3)),
+                                    ),
+                                    child: DropdownButtonHideUnderline(
+                                      child: DropdownButton<int>(
+                                        value: _contactCount,
+                                        icon: const Icon(Icons.arrow_drop_down_rounded, color: AppTheme.forestGreen),
+                                        style: const TextStyle(color: AppTheme.forestGreen, fontWeight: FontWeight.w700, fontSize: 14),
+                                        items: [1, 2, 3, 4, 5].map((int val) {
+                                          return DropdownMenuItem<int>(
+                                            value: val,
+                                            child: Text('$val ${val == 1 ? "Person" : "People"}'),
+                                          );
+                                        }).toList(),
+                                        onChanged: (newVal) {
+                                          if (newVal != null && newVal != _contactCount) {
+                                            _updateContactCount(newVal);
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 14),
+                              ...List.generate(_contactCount, (index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Person ${index + 1} Emergency Phone Number',
+                                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      TextFormField(
+                                        controller: _contactControllers[index],
+                                        keyboardType: TextInputType.phone,
+                                        decoration: InputDecoration(
+                                          hintText: 'e.g. 7539965565',
+                                          hintStyle: TextStyle(color: Colors.grey.shade400),
+                                          prefixIcon: Icon(Icons.phone_in_talk_rounded, color: AppTheme.forestGreen.withValues(alpha: 0.7)),
+                                          filled: true,
+                                          fillColor: const Color(0xFFF8FAF9),
+                                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                                          border: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                          enabledBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: BorderSide(color: Colors.grey.shade300),
+                                          ),
+                                          focusedBorder: OutlineInputBorder(
+                                            borderRadius: BorderRadius.circular(12),
+                                            borderSide: const BorderSide(color: AppTheme.forestGreen, width: 1.5),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              }),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 16),

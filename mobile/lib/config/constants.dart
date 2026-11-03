@@ -1,3 +1,5 @@
+import 'package:flutter/material.dart';
+
 /// ForestGuard - App Constants
 /// API URLs and configuration loaded from build config.
 class AppConstants {
@@ -11,6 +13,13 @@ class AppConstants {
   static const String appName = 'ForestGuard';
   static const String appVersion = '1.0.0';
 
+  // MapTiler Configuration
+  static const String mapTilerApiKey = '8Yw0FgmmTm08f2u2Gc49';
+  static const String mapTilerSatelliteUrl =
+      'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=8Yw0FgmmTm08f2u2Gc49';
+  static const String mapTilerHybridUrl =
+      'https://api.maptiler.com/maps/hybrid/{z}/{x}/{y}.jpg?key=8Yw0FgmmTm08f2u2Gc49';
+
   // Location
   static const int locationUpdateIntervalSeconds = 30;
   static const double defaultLatitude = 11.5690;
@@ -23,33 +32,58 @@ class AppConstants {
 
   // Safety labels
   static const Map<String, String> safetyMessages = {
-    'safe': 'No active wildlife safety alert near your current location.',
+    'safe': 'No active alerts. Conditions are stable and all clear.',
     'approaching': 'You are approaching an active wildlife safety zone.',
     'inside':
         'Your current location is within an active wildlife safety zone. '
         'Remain at a safe location and follow official ranger instructions.',
   };
 
-  // Animal info (No emojis, simple clean names: tiger, elephant, lion, leopard, bear)
+  // Animal info (Rich species display names, emojis & Material Icons)
   static const Map<String, String> animalEmojis = {
-    'tiger': '',
-    'elephant': '',
-    'lion': '',
-    'leopard': '',
-    'bear': '',
+    'tiger': '🐅',
+    'bengal tiger': '🐅',
+    'elephant': '🐘',
+    'asian elephant': '🐘',
+    'lion': '🦁',
+    'african lion': '🦁',
+    'leopard': '🐆',
+    'indian leopard': '🐆',
+    'bear': '🐻',
+    'sloth bear': '🐻',
+    'sloth': '🐻',
   };
 
+  static const Map<String, IconData> animalIcons = {
+    'tiger': Icons.pets_rounded,
+    'bengal tiger': Icons.pets_rounded,
+    'elephant': Icons.forest_rounded,
+    'asian elephant': Icons.forest_rounded,
+    'lion': Icons.cruelty_free_rounded,
+    'african lion': Icons.cruelty_free_rounded,
+    'leopard': Icons.radar_rounded,
+    'indian leopard': Icons.radar_rounded,
+    'bear': Icons.landscape_rounded,
+    'sloth bear': Icons.landscape_rounded,
+    'sloth': Icons.landscape_rounded,
+  };
+
+  static IconData getAnimalIcon(String animalType) {
+    final key = animalType.toLowerCase();
+    return animalIcons[key] ?? Icons.pets_rounded;
+  }
+
   static const Map<String, String> animalNames = {
-    'tiger': 'tiger',
-    'elephant': 'elephant',
-    'lion': 'lion',
-    'leopard': 'leopard',
-    'bear': 'bear',
-    'bengal tiger': 'tiger',
-    'asian elephant': 'elephant',
-    'sloth bear': 'bear',
-    'sloth': 'bear',
-    'african lion': 'lion',
-    'indian leopard': 'leopard',
+    'tiger': 'Bengal Tiger',
+    'bengal tiger': 'Bengal Tiger',
+    'elephant': 'Asian Elephant',
+    'asian elephant': 'Asian Elephant',
+    'lion': 'African Lion',
+    'african lion': 'African Lion',
+    'leopard': 'Indian Leopard',
+    'indian leopard': 'Indian Leopard',
+    'bear': 'Sloth Bear',
+    'sloth bear': 'Sloth Bear',
+    'sloth': 'Sloth Bear',
   };
 }

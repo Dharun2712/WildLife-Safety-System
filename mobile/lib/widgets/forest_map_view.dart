@@ -7,10 +7,10 @@ import '../config/constants.dart';
 import '../config/theme.dart';
 import 'detection_alert_modal.dart';
 
-/// Enum to support modular map tile providers (OpenStreetMap default, extensible to Mapbox/Google)
-enum MapProviderType { openStreetMap, cartoDark, satellite }
+/// Enum to support modular map tile providers (MapTiler Satellite default)
+enum MapProviderType { maptilerSatellite, maptilerHybrid, satellite, cartoDark, openStreetMap }
 
-/// Interactive GIS Map Widget using OpenStreetMap (flutter_map)
+/// Interactive GIS Map Widget using MapTiler Satellite (flutter_map)
 /// Supports forest zone polygons, camera nodes, wildlife markers,
 /// multiple simultaneous circular danger zones, user GPS location, marker popups,
 /// zoom/pan controls, and RBAC-scoped tourist markers.
@@ -29,7 +29,7 @@ class ForestMapView extends StatefulWidget {
     this.alerts = const [],
     this.touristLocations = const [],
     this.isRanger = false,
-    this.providerType = MapProviderType.openStreetMap,
+    this.providerType = MapProviderType.maptilerSatellite,
     this.initialCenter,
     this.initialZoom = 13.5,
   });
@@ -144,10 +144,13 @@ class _ForestMapViewState extends State<ForestMapView> {
 
   String _getTileUrl() {
     switch (widget.providerType) {
+      case MapProviderType.maptilerSatellite:
+      case MapProviderType.satellite:
+        return AppConstants.mapTilerSatelliteUrl;
+      case MapProviderType.maptilerHybrid:
+        return AppConstants.mapTilerHybridUrl;
       case MapProviderType.cartoDark:
         return 'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png';
-      case MapProviderType.satellite:
-        return 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
       case MapProviderType.openStreetMap:
         return 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
     }

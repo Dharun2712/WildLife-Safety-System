@@ -44,12 +44,13 @@ def _haversine(lat1, lon1, lat2, lon2):
 
 
 SAFETY_MESSAGES = {
-    "safe": "No active wildlife safety alert near your current location.",
+    "safe": "No active alerts. Conditions are stable and all clear.",
     "approaching": "You are approaching an active wildlife safety zone.",
     "inside": (
         "Your current location is within an active wildlife safety zone. "
         "Remain at a safe location and follow official ranger instructions."
     ),
+    "danger": "Active wildlife threat detected in your area! Please stay alert.",
 }
 
 

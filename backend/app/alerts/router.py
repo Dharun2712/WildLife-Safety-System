@@ -79,9 +79,9 @@ async def list_alerts(
     if status_filter:
         query["status"] = status_filter
     
-    # Tourists only see active alerts
+    # Tourists see active, acknowledged, monitoring, and closed alerts
     if current_user.get("role") == "tourist":
-        query["status"] = {"$in": ["active", "acknowledged", "monitoring"]}
+        query["status"] = {"$in": ["active", "acknowledged", "monitoring", "closed"]}
     
     cursor = db.alerts.find(query).sort("created_at", -1).limit(limit)
     alerts = await cursor.to_list(length=limit)
@@ -121,7 +121,7 @@ async def acknowledge_alert(
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
     
-    if alert["status"] not in ["active", "needs_verification"]:
+    if alert["status"] not in ["active", "needs_verification", "verified"]:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Cannot acknowledge alert with status '{alert['status']}'")
     
     now = datetime.now(timezone.utc)
@@ -145,11 +145,18 @@ async def acknowledge_alert(
             {"$set": {"ranger_acknowledged": True, "updated_at": now}}
         )
     
-    # Broadcast
-    await ws_manager.broadcast_to_rangers("alert_acknowledged", {
+    # Broadcast to rangers and tourists
+    payload = {
         "alert_id": alert_id,
+        "animal_type": alert["animal_type"],
         "acknowledged_by": current_user["username"],
-    })
+        "status": new_status,
+        "ranger_acknowledged": True,
+        "zone_code": alert.get("zone_code", "Sector 4"),
+        "message": f"Forest ranger {current_user['username']} has acknowledged and responded to the alert.",
+    }
+    await ws_manager.broadcast_to_rangers("alert_acknowledged", payload)
+    await ws_manager.broadcast_to_tourists("alert_acknowledged", payload)
     
     updated = await db.alerts.find_one({"_id": oid})
     return _format_alert(updated)
@@ -221,6 +228,15 @@ async def verify_alert(
         "radius_meters": danger_radius,
         "zone_code": alert.get("zone_code"),
         "verified_by": current_user["username"],
+    })
+    
+    # Notify tourists that the alert has been verified
+    await ws_manager.broadcast_to_tourists("alert_verified", {
+        "alert_id": alert_id,
+        "animal_type": alert["animal_type"],
+        "verified_by": current_user["username"],
+        "zone_code": alert.get("zone_code"),
+        "message": f"Ranger {current_user['username']} has verified the {alert['animal_type']} detection.",
     })
     
     # Notify affected tourists

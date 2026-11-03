@@ -42,7 +42,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     // Main entrance animation
     _mainController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 800),
     );
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _mainController, curve: const Interval(0, 0.5, curve: Curves.easeOut)),
@@ -71,21 +71,27 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
 
     _mainController.forward();
 
-    // Auth check
-    Future.delayed(const Duration(seconds: 3), () async {
-      await ref.read(authProvider.notifier).checkAuth();
-      if (!mounted) return;
-      final auth = ref.read(authProvider);
-      if (auth.isAuthenticated) {
-        if (auth.role == 'ranger' || auth.role == 'admin') {
-          context.go('/ranger');
-        } else {
-          context.go('/tourist');
-        }
+    // Immediate fast auth check concurrent with minimum splash display
+    _initializeApp();
+  }
+
+  Future<void> _initializeApp() async {
+    final minDisplayFuture = Future.delayed(const Duration(milliseconds: 800));
+    final authCheckFuture = ref.read(authProvider.notifier).checkAuth();
+
+    await Future.wait([minDisplayFuture, authCheckFuture]);
+
+    if (!mounted) return;
+    final auth = ref.read(authProvider);
+    if (auth.isAuthenticated) {
+      if (auth.role == 'ranger' || auth.role == 'admin') {
+        context.go('/ranger');
       } else {
-        context.go('/onboarding');
+        context.go('/tourist');
       }
-    });
+    } else {
+      context.go('/onboarding');
+    }
   }
 
   @override

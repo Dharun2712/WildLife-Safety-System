@@ -16,6 +16,7 @@ from app.auth.dependencies import get_current_user, require_role
 from app.auth.schemas import UserRole
 from app.database.connection import get_database
 from app.websocket.manager import ws_manager
+from app.sms.twilio_service import sms_service
 
 router = APIRouter(prefix="/api/wildlife", tags=["Wildlife"])
 
@@ -410,6 +411,59 @@ async def create_detection(
                     "Please remain at a safe location and follow official ranger instructions."
                 ),
             }, tourist_ids=nearby["all_affected"])
+
+    # Send emergency SMS to tourist emergency contacts & 7539965565 on dangerous wildlife detection
+    if is_high_confidence:
+        tourist_names = []
+        contacts_to_notify = {"7539965565"}
+        risk_lvl = "CRITICAL"
+
+        # Check nearby tourists first
+        try:
+            nearby_data = locals().get("nearby", {})
+            affected = nearby_data.get("all_affected", []) if isinstance(nearby_data, dict) else []
+            for tid in affected:
+                t_user = await db.users.find_one({"_id": ObjectId(tid)})
+                if t_user:
+                    tourist_names.append(t_user.get("full_name") or t_user.get("username", "Tourist"))
+                    for ec in t_user.get("emergency_contacts", []):
+                        if ec:
+                            contacts_to_notify.add(str(ec))
+            if nearby_data.get("inside"):
+                risk_lvl = "CRITICAL (Inside Danger Zone)"
+            elif nearby_data.get("approaching"):
+                risk_lvl = "HIGH (Approaching Danger Zone)"
+        except Exception as e:
+            pass
+
+        # If no tourists detected nearby, personalize with latest tourist and notify registered contacts
+        if not tourist_names:
+            try:
+                latest_tourist = await db.users.find_one({"role": "tourist"}, sort=[("created_at", -1)])
+                if latest_tourist:
+                    tourist_names.append(latest_tourist.get("full_name") or latest_tourist.get("username", "Tourist"))
+                    for ec in latest_tourist.get("emergency_contacts", []):
+                        if ec:
+                            contacts_to_notify.add(str(ec))
+            except Exception:
+                pass
+
+        primary_tourist = ", ".join(tourist_names) if tourist_names else "Tourist"
+        loc_str = f"Zone {zone_code or 'Sector 4'} ({payload.latitude:.4f}° N, {payload.longitude:.4f}° E)"
+        animal_cap = payload.animal_type.capitalize()
+        det_time_str = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+        try:
+            await sms_service.send_emergency_alert(
+                phone_numbers=list(contacts_to_notify),
+                tourist_name=primary_tourist,
+                animal_name=animal_cap,
+                risk_level=risk_lvl,
+                location=loc_str,
+                detection_time=det_time_str,
+            )
+        except Exception as e:
+            pass
     
     return DetectionResponse(
         id=str(detection_id),
@@ -530,3 +584,52 @@ async def get_movement_history(
         }
         for m in movements
     ]
+
+
+class TestSMSRequest(BaseModel):
+    phone_number: Optional[str] = "7539965565"
+    tourist_name: Optional[str] = "Dharun"
+    animal_name: Optional[str] = "Bengal Tiger"
+    risk_level: Optional[str] = "CRITICAL (Proximity Alert)"
+    location: Optional[str] = "Mudumalai Core Area (11.5690° N, 76.6320° E)"
+
+
+@router.post("/test-alert-sms")
+async def trigger_test_alert_sms(
+    request: TestSMSRequest = TestSMSRequest(),
+    db: AsyncIOMotorDatabase = Depends(get_database),
+):
+    """Test sending Twilio emergency alert SMS."""
+    now = datetime.now(timezone.utc)
+    det_time = now.strftime("%Y-%m-%d %H:%M:%S UTC")
+
+    contacts = [request.phone_number]
+    try:
+        latest_tourist = await db.users.find_one({"role": "tourist"}, sort=[("created_at", -1)])
+        if latest_tourist:
+            for ec in latest_tourist.get("emergency_contacts", []):
+                if ec and ec not in contacts:
+                    contacts.append(ec)
+    except Exception:
+        pass
+
+    result = await sms_service.send_emergency_alert(
+        phone_numbers=contacts,
+        tourist_name=request.tourist_name,
+        animal_name=request.animal_name,
+        risk_level=request.risk_level,
+        location=request.location,
+        detection_time=det_time,
+    )
+    return {
+        "status": "completed",
+        "recipients": contacts,
+        "result": result,
+        "message_preview": sms_service._build_alert_message(
+            tourist_name=request.tourist_name,
+            animal_name=request.animal_name,
+            risk_level=request.risk_level,
+            location=request.location,
+            detection_time=det_time,
+        ),
+    }

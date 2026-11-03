@@ -5,7 +5,7 @@ Pydantic models for auth request/response validation.
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -16,6 +16,11 @@ class UserRole(str, Enum):
     ADMIN = "admin"
 
 
+class EmergencyContact(BaseModel):
+    """Emergency contact phone number."""
+    phone: str = Field(..., min_length=5, max_length=20)
+
+
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
     email: EmailStr
@@ -23,6 +28,7 @@ class RegisterRequest(BaseModel):
     full_name: str = Field(..., min_length=2, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     role: UserRole = UserRole.TOURIST
+    emergency_contacts: Optional[List[Union[str, EmergencyContact]]] = Field(default_factory=list)
 
 
 class LoginRequest(BaseModel):
@@ -50,6 +56,7 @@ class UserResponse(BaseModel):
     full_name: str
     phone: Optional[str] = None
     role: UserRole
+    emergency_contacts: Optional[List[str]] = Field(default_factory=list)
     is_active: bool = True
     created_at: Optional[datetime] = None
 
@@ -66,3 +73,4 @@ class UpdateProfileRequest(BaseModel):
     full_name: Optional[str] = Field(None, min_length=2, max_length=100)
     phone: Optional[str] = Field(None, max_length=20)
     email: Optional[EmailStr] = None
+    emergency_contacts: Optional[List[str]] = None
