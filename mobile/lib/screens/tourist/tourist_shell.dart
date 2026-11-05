@@ -154,7 +154,7 @@ class _TouristShellState extends ConsumerState<TouristShell> {
   }
 
   void _triggerSOS() async {
-    SoundService.instance.playAlertSound();
+    // Do NOT play alarm on tourist device - only rangers should get the alarm
     try {
       await ApiService().dio.post('/api/sos', data: {
         'latitude': 11.5690,

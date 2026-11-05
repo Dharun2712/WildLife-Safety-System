@@ -11,7 +11,7 @@ class SOSActiveDialog extends ConsumerStatefulWidget {
   const SOSActiveDialog({super.key});
 
   static Future<void> show(BuildContext context) {
-    SoundService.instance.playAlertSound();
+    // Do NOT play alarm on tourist side - calm status tracker only
     return showGeneralDialog<void>(
       context: context,
       barrierDismissible: false,
