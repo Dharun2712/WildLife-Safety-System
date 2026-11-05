@@ -62,6 +62,7 @@ async def get_current_user(
 
     # Convert ObjectId to string for serialization
     user["id"] = str(user["_id"])
+    user["user_id"] = str(user["_id"])
     return user
 
 

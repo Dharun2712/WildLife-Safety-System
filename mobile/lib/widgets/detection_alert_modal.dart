@@ -326,7 +326,8 @@ class DetectionAlertModal extends StatelessWidget {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                           onPressed: () {
-                            SoundService.instance.playAlertSound();
+                            // Stop alert sound on tourist device when triggering SOS
+                            SoundService.instance.stopSound();
                             Navigator.of(context).pop();
                             if (onTriggerSOS != null) onTriggerSOS!();
                           },

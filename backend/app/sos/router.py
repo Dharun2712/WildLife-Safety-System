@@ -4,6 +4,7 @@ Tourist SOS requests sent to rangers as modal popups.
 Status flow: unverified → verified → acknowledged (solved)
 """
 
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -16,6 +17,8 @@ from app.auth.dependencies import get_current_user, require_role
 from app.auth.schemas import UserRole
 from app.database.connection import get_database
 from app.websocket.manager import ws_manager
+
+logger = logging.getLogger("forestguard.sos")
 
 router = APIRouter(prefix="/api/sos", tags=["SOS"])
 
@@ -64,29 +67,36 @@ async def create_sos(
 ):
     """Tourist creates an SOS request — broadcasted to all rangers as a modal popup."""
     now = datetime.now(timezone.utc)
+    user_id_val = current_user.get("_id") or current_user.get("user_id") or current_user.get("id")
+    user_oid = user_id_val if isinstance(user_id_val, ObjectId) else ObjectId(str(user_id_val))
+    tourist_name = current_user.get("full_name") or current_user.get("username") or "Tourist"
+    sos_message = request.message or "Emergency! I need immediate assistance!"
 
     sos_doc = {
-        "tourist_id": ObjectId(current_user["user_id"]),
-        "tourist_name": current_user.get("full_name", current_user.get("username", "Tourist")),
+        "tourist_id": user_oid,
+        "tourist_name": tourist_name,
         "latitude": request.latitude,
         "longitude": request.longitude,
-        "message": request.message,
+        "message": sos_message,
         "status": "unverified",
         "created_at": now,
         "updated_at": now,
     }
 
     result = await db.sos_requests.insert_one(sos_doc)
+    sos_id_str = str(result.inserted_id)
     sos_doc["_id"] = result.inserted_id
+
+    logger.warning(f"🚨 [SOS CREATED] {tourist_name} triggered SOS at ({request.latitude}, {request.longitude}). Broadcasting to all rangers.")
 
     # Broadcast SOS request to all rangers as modal popup
     await ws_manager.broadcast_to_rangers("sos_request", {
-        "sos_id": str(result.inserted_id),
-        "tourist_id": str(current_user["user_id"]),
-        "tourist_name": sos_doc["tourist_name"],
+        "sos_id": sos_id_str,
+        "tourist_id": str(user_oid),
+        "tourist_name": tourist_name,
         "latitude": request.latitude,
         "longitude": request.longitude,
-        "message": request.message,
+        "message": sos_message,
         "status": "unverified",
     })
 
@@ -107,7 +117,9 @@ async def list_sos(
 
     # Tourists only see their own SOS requests
     if current_user.get("role") == "tourist":
-        query["tourist_id"] = ObjectId(current_user["user_id"])
+        user_id_val = current_user.get("_id") or current_user.get("user_id") or current_user.get("id")
+        user_oid = user_id_val if isinstance(user_id_val, ObjectId) else ObjectId(str(user_id_val))
+        query["tourist_id"] = user_oid
 
     cursor = db.sos_requests.find(query).sort("created_at", -1).limit(limit)
     requests = await cursor.to_list(length=limit)

@@ -71,12 +71,15 @@ class _RangerShellState extends ConsumerState<RangerShell> {
         SoundService.instance.playAlertSound();
         ref.invalidate(sosRequestsProvider);
         if (mounted) {
+          final lat = data['latitude']?.toString() ?? '11.5690';
+          final lng = data['longitude']?.toString() ?? '76.6320';
           PopupNotification.show(
             context,
             title: '🚨 SOS EMERGENCY',
-            message: '${data['tourist_name'] ?? 'Tourist'} needs help!',
+            message: '${data['tourist_name'] ?? 'Tourist'} needs help!\n📍 Location: $lat° N, $lng° E',
             icon: Icons.emergency_rounded,
             color: AppTheme.error,
+            duration: const Duration(seconds: 10),
           );
           SOSRequestModal.show(
             context,
@@ -256,6 +259,7 @@ class _RangerHomeTabState extends ConsumerState<_RangerHomeTab> {
     final alertsAsync = ref.watch(alertsProvider);
     final zonesAsync = ref.watch(dangerZonesProvider);
     final camerasAsync = ref.watch(camerasProvider);
+    final sosAsync = ref.watch(sosRequestsProvider);
 
     return Scaffold(
       backgroundColor: AppTheme.surface,
@@ -296,10 +300,154 @@ class _RangerHomeTabState extends ConsumerState<_RangerHomeTab> {
           ref.invalidate(dangerZonesProvider);
           ref.invalidate(camerasProvider);
           ref.invalidate(detectionsProvider);
+          ref.invalidate(sosRequestsProvider);
         },
         child: ListView(
           padding: const EdgeInsets.only(left: 16, right: 16, top: 16, bottom: 120),
           children: [
+            // 🚨 ACTIVE SOS EMERGENCY BANNER (Displays location and responder action)
+            Builder(
+              builder: (context) {
+                final sosList = sosAsync.value ?? [];
+                final activeSos = sosList.where((s) {
+                  final st = (s['status'] ?? '').toString().toLowerCase();
+                  return st == 'unverified' || st == 'verified' || st == 'active';
+                }).toList();
+                if (activeSos.isEmpty) return const SizedBox.shrink();
+
+                final firstSos = activeSos.first;
+                final tourist = firstSos['tourist_name'] ?? 'Tourist';
+                final lat = firstSos['latitude']?.toString() ?? '11.5690';
+                final lng = firstSos['longitude']?.toString() ?? '76.6320';
+                final statusStr = (firstSos['status'] ?? 'unverified').toString().toUpperCase();
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7F1D1D), Color(0xFFDC2626)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withValues(alpha: 0.35),
+                        blurRadius: 16,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.emergency_rounded, color: Colors.white, size: 24),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  '🚨 ACTIVE SOS EMERGENCY',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 15,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                                Text(
+                                  '$tourist needs immediate assistance!',
+                                  style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              statusStr,
+                              style: const TextStyle(
+                                color: Color(0xFFDC2626),
+                                fontWeight: FontWeight.w900,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.location_on_rounded, color: Colors.amberAccent, size: 18),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Location: $lat° N, $lng° E (Mudumalai)',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  fontFamily: 'monospace',
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFFDC2626),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            elevation: 0,
+                          ),
+                          onPressed: () {
+                            SOSRequestModal.show(
+                              context,
+                              sosData: firstSos,
+                              onVerify: () => ref.invalidate(sosRequestsProvider),
+                              onAcknowledge: () => ref.invalidate(sosRequestsProvider),
+                              onViewOnMap: widget.onViewMap,
+                            );
+                          },
+                          icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                          label: const Text(
+                            'RESPOND TO SOS',
+                            style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+
             // Stitch Ranger Profile Header Card
             Container(
               padding: const EdgeInsets.all(16),
